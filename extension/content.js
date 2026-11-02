@@ -14,6 +14,7 @@
   <button id="blockTarget">1 · S1 / anderen Block als Klickziel wählen</button>
   <button id="area">1 · Bereich der Blöcke markieren</button>
   <button id="seats">2 · Suchbereich für einzelne Plätze markieren</button>
+  <label><input id="autoCart" type="checkbox" checked> Hinzufügen-Schaltfläche automatisch finden</label>
   <button id="next">3 · Einkaufswagen wählen</button>
   <button id="exclude">Spielfeld / Legende aus der Suche ausschließen</button>
   <button id="clearExcluded">Ausschlüsse löschen (0)</button>
@@ -21,14 +22,14 @@
   <label>Platz wählen <select id="seatClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label><input id="automatic" type="checkbox"> Aktionen automatisch ausführen</label>
   <button id="start">Überwachung starten</button><button id="stop" disabled>Stoppen</button>
-  <output role="status" aria-live="polite">Markiere nur die Platzpunkte im Saalplan und wähle den Einkaufswagen.</output>
+  <output role="status" aria-live="polite">Markiere den Platzsuchbereich. Die Hinzufügen-Schaltfläche wird erst nach der Platzauswahl gesucht.</output>
   <small>Auch bestehende Verfügbarkeit wird geprüft. Testmodus klickt nicht. In der Gesamtübersicht das Spielfeld und farbige Symbole ausschließen. Escape stoppt jederzeit.</small></section>`;
   const $ = id => root.getElementById(id);
-  const controls = ['area','blockTarget','blockName','seats','next','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
+  const controls = ['area','blockTarget','blockName','seats','next','autoCart','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
   const labels = {area:'1 · Bereich der Blöcke markieren',seats:'2 · Suchbereich für einzelne Plätze markieren',next:'3 · Einkaufswagen wählen'};
   const regions = {};
   const exclusions = [];
-  let cart, blockTarget, running = false, generation = 0, lastCapture = 0, cleanupSelection;
+  let cart, blockTarget, runAbort, running = false, generation = 0, lastCapture = 0, cleanupSelection;
   const say = text => root.querySelector('output').textContent = text;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   function updateMode() {
@@ -42,11 +43,14 @@
     $('exclude').style.display = blocks ? '' : 'none'; $('clearExcluded').style.display = blocks ? '' : 'none';
     $('seats').textContent = blocks || target || named ? labels.seats : '1 · Bereich mit Platzpunkten markieren';
     $('next').textContent = blocks || target || named ? labels.next : '2 · Einkaufswagen wählen';
+    $('next').style.display = $('autoCart').checked ? 'none' : '';
   }
   $('mode').onchange = updateMode; updateMode();
+  $('autoCart').onchange = updateMode;
   const active = token => running && generation === token && !document.hidden;
   function stop(text = 'Gestoppt.') {
     running = false; generation++;
+    runAbort?.abort();
     controls.forEach(id => $(id).disabled = false); $('stop').disabled = true;
     say(text);
   }
@@ -177,13 +181,15 @@
     if (!regions.seats || (blocks && !regions.area)) return say('Markiere zuerst die benötigten Suchbereiche.');
     if (targeted && !blockTarget) return say('Wähle zuerst S1 oder einen anderen Block als Klickziel.');
     const automatic=$('automatic').checked;
-    if (automatic && !cart) return say('Wähle zuerst den Einkaufswagen.');
+    const autoCart=$('autoCart').checked;
+    if (automatic && !autoCart && !cart) return say('Wähle den Einkaufswagen oder aktiviere die automatische Schaltflächensuche.');
     const panel=host.getBoundingClientRect();
     for (const rect of blocks ? Object.values(regions) : [regions.seats]) {
       if (rect.x<panel.right && rect.x+rect.width>panel.left && rect.y<panel.bottom && rect.y+rect.height>panel.top) return say('Ein Suchbereich überschneidet sich mit dem Bedienfeld.');
     }
     const blockDouble=$('blockClicks').value==='2',seatDouble=$('seatClicks').value==='2';
     running=true; const token=++generation;
+    runAbort=new AbortController();
     controls.forEach(id=>$(id).disabled=true); $('stop').disabled=false;
     try {
       say(automatic?'Aktiv · Suche Verfügbarkeit …':'Testmodus aktiv · Keine Klicks …');
@@ -210,6 +216,17 @@
       if (!automatic) return stop('Freier farbiger Platz erkannt. Keine Klicks ausgeführt.');
       say('Freier Platz erkannt · Platz wird ausgewählt …');
       click(seat,seatDouble);
+      if (!active(token)) return;
+      if (autoCart) {
+        say('Platz angeklickt · warte auf aktive Hinzufügen-Schaltfläche …');
+        const found=await TicketCart.waitForAction({signal:runAbort.signal,exclude:host});
+        if (!active(token)) return;
+        const current=TicketCart.findActions(host);
+        if (current.length!==1 || current[0].element!==found.element) throw new Error('Hinzufügen-Ziel hat sich geändert. Kein Warenkorbklick.');
+        click(current[0],false);
+        if (active(token)) stop('Platz angeklickt → Hinzufügen-Schaltfläche betätigt. Ergebnis bitte auf der Seite prüfen.');
+        return;
+      }
       await sleep(250);
       if (!active(token)) return;
       const deadline=Date.now()+3000;

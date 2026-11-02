@@ -1,14 +1,15 @@
-<!doctype html><html lang="de"><meta charset="utf-8"><title>Test · Block → Platz → Warenkorb</title>
-<style>body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:40px;max-width:600px}#plan{position:relative;width:400px;height:280px;background:#eee;border-radius:12px}#block{position:absolute;left:50px;top:50px;width:100px;height:70px;background:#6c7400;border:0;border-radius:10px;color:white;cursor:pointer}#seat{display:none;position:absolute;left:180px;top:140px;width:18px;height:18px;background:#6c7400;border-radius:50%;cursor:pointer}#cart{position:fixed;right:35px;bottom:35px}button{font:inherit;padding:10px;margin:12px 0}output{display:block;margin-top:20px}</style>
-<h1>Block → Platz → Warenkorb</h1><p>Wähle „Plätze bereits sichtbar“, markiere die Karte als Platzsuchbereich und wähle den Warenkorb unten rechts. Mit „Blockübersicht“ lässt sich die automatische Namenssuche für S1 testen.</p>
-<div id="plan"><button id="block"><span>S1</span></button><div id="seat"></div></div><button id="reset">Platzansicht</button><button id="overview">Blockübersicht</button><button id="cart" disabled>🛒 Warenkorb</button><output id="log">Warte auf Blockklick.</output>
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Test · Platz → Add items</title>
+<style>body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:40px;max-width:600px}#plan{position:relative;width:400px;height:280px;background:#d9e4e2;border-radius:12px}#block{display:none;position:absolute;left:50px;top:50px;width:100px;height:70px;background:#6c7400;border:0;border-radius:10px;color:white;cursor:pointer}#seat{position:absolute;left:180px;top:140px;width:18px;height:18px;background:#a3a56c;border-radius:50%;cursor:pointer}#cart{position:fixed;right:35px;bottom:35px}button{font:inherit;padding:10px;margin:12px 0}output{display:block;margin-top:20px}</style>
+<h1>Platz → Add items</h1><p>Wähle „Einzelne Plätze bereits sichtbar“ und markiere die Karte. „Hinzufügen-Schaltfläche automatisch finden“ bleibt aktiv. Erst nach dem Platzklick wird der Add-items-Knopf erzeugt. Mit „Blockübersicht“ lässt sich die automatische Namenssuche für S1 testen.</p>
+<div id="plan"><button id="block"><span>S1</span></button><div id="seat"></div></div><button id="reset">Platzansicht</button><button id="overview">Blockübersicht</button><output id="log">Freier Platz sichtbar. Noch kein Warenkorbknopf.</output>
 <script>
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id);let timer;
+function clearCart(){clearTimeout(timer);$('cart')?.remove()}
 $('block').onclick=()=>{$('block').style.display='none';$('seat').style.display='block';$('plan').style.background='#d9e4e2';$('log').textContent='Block geöffnet. Warte auf Platzauswahl.'};
-$('seat').onclick=()=>{$('seat').style.background='#1766bb';$('cart').disabled=false;$('log').textContent='Platz gewählt. Warte auf Warenkorb.'};
-$('cart').onclick=()=>{$('cart').disabled=true;$('log').textContent='Test erfolgreich: Block → Platz → Warenkorb.'};
-$('reset').onclick=()=>{$('block').style.display='block';$('seat').style.display='none';$('seat').style.background='#6c7400';$('plan').style.background='#eee';$('cart').disabled=true;$('log').textContent='Warte auf Blockklick.'};
-$('overview').onclick=()=>{$('block').style.display='block';$('seat').style.display='none';$('seat').style.background='#6c7400';$('plan').style.background='#eee';$('cart').disabled=true;$('log').textContent='Warte auf Blockklick.'};
-$('reset').onclick=()=>{$('block').style.display='none';$('seat').style.display='block';$('seat').style.background='#a3a56c';$('plan').style.background='#d9e4e2';$('cart').disabled=true;$('log').textContent='Freier Platz sichtbar.'};
-$('reset').click();
+$('seat').onclick=()=>{
+  clearCart();$('seat').style.background='#1766bb';$('log').textContent='Platz gewählt. Hinzufügen-Schaltfläche erscheint gleich.';
+  timer=setTimeout(()=>{const button=document.createElement('button');button.id='cart';button.textContent='🛒 Add items';button.onclick=()=>{button.remove();$('log').textContent='Test erfolgreich: Platz → dynamische Hinzufügen-Schaltfläche.'};document.body.append(button);},350);
+};
+$('overview').onclick=()=>{clearCart();$('block').style.display='block';$('seat').style.display='none';$('seat').style.background='#a3a56c';$('plan').style.background='#eee';$('log').textContent='Warte auf automatisches Öffnen von S1.'};
+$('reset').onclick=()=>{clearCart();$('block').style.display='none';$('seat').style.display='block';$('seat').style.background='#a3a56c';$('plan').style.background='#d9e4e2';$('log').textContent='Freier Platz sichtbar. Noch kein Warenkorbknopf.'};
 </script></html>

@@ -9,13 +9,25 @@ Chrome-/Edge-Erweiterung: **Runden farbigen Platzpunkt erkennen → einmal auf d
 3. Zum Aktualisieren den bisherigen Erweiterungsordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Anschließend auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
 4. Die vollständig geladene Ticketseite öffnen und das Erweiterungssymbol anklicken.
 
+## Hinzufügen-Schaltfläche erst nach Platzauswahl finden
+
+Standard ist **Hinzufügen-Schaltfläche automatisch finden**. Du musst keinen Warenkorbbereich vorab markieren; die Schaltfläche darf am Anfang vollständig fehlen.
+
+Nach dem Platzklick sucht der Wächter anhand von sichtbarem Text, `aria-label`, `aria-labelledby` oder `title` nach einer Aktion wie **In den Warenkorb**, **Zum Warenkorb hinzufügen**, **Add to cart**, **Add items** oder dem Icon-Namen **add_shopping_cart**. Eine DOM-Beobachtung reagiert auf neu eingefügte oder geänderte Schaltflächen; ergänzend wird alle 100 ms die Sichtbarkeit geprüft. Es wird nicht auf einen festen Zeitpunkt oder eine Bildschirmposition vertraut.
+
+Die Schaltfläche muss sichtbar, im aktuellen Bildausschnitt, nicht verdeckt und aktiv sein. Ein später ersetztes Element wird neu gesucht. Nur ein eindeutiger Treffer wird angeklickt. Bei mehreren aktiven passenden Zielen oder nach acht Sekunden ohne eindeutigen aktiven Treffer wird abgebrochen. Escape/Stoppen beendet auch diese Wartephase. Reine Links zum Anzeigen des Warenkorbs und Checkout-Schaltflächen zählen nicht als Hinzufügen-Aktion.
+
+Die automatische Suche ist lokal getestet, aber noch nicht gegen den echten Shop geprüft. Ein ausschließlich gezeichnetes oder unbeschriftetes Icon, ein geschlossenes Shadow DOM oder ein eingebetteter Frame werden damit nicht zuverlässig erkannt. Ein beliebiges „Hinzufügen“ ohne Bezug zum Warenkorb wird nicht geraten. Dafür muss die tatsächliche Seitenschaltfläche integriert werden, sobald Zugriff auf die Seite möglich ist.
+
+Optional kann die automatische Schaltflächensuche abgeschaltet und ein bereits sichtbares Warenkorbziel manuell gewählt werden. Dieser ältere Modus ist nur geeignet, wenn das Element während des Ablaufs erhalten bleibt.
+
 ## Empfohlen für S1: Blocknamen automatisch suchen
 
 **Du musst den Block nicht selbst öffnen und auch nicht vorher als Klickziel auswählen.** Standard ist jetzt **Block nach Namen automatisch öffnen**, mit vorbelegtem Blocknamen **S1**.
 
 1. In der Stadionübersicht den Modus **Block nach Namen automatisch öffnen** und den Namen **S1** beibehalten.
 2. Den **Suchbereich für einzelne Plätze** markieren: den Kartenbereich, in dem nach der automatischen Blocköffnung die Platzpunkte erscheinen. Dabei nicht den Block öffnen; das Rechteck bezeichnet nur den späteren Suchausschnitt.
-3. Den Einkaufswagen als Ziel auswählen und die Platzauswahl auf Einfachklick belassen.
+3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet und die Platzauswahl auf Einfachklick lassen. Ein Warenkorbziel muss nicht gewählt werden.
 4. Im Testmodus prüfen, ob „Block S1 gefunden“ gemeldet wird. Dies prüft die automatische Zuordnung des Blocknamens, bestätigt aber noch keine freien Tickets und klickt nicht.
 5. **Aktionen automatisch ausführen** aktivieren und starten. Der Wächter findet S1 über den Seitentext/SVG-Blocknamen, öffnet ihn selbst unabhängig von seinem Farbton, sucht nach dem Ansichtswechsel einen freien Platz und klickt anschließend den Warenkorb.
 
@@ -29,7 +41,7 @@ Der geringe Darstellungsunterschied von S1 in der Stadionübersicht wird nicht a
 
 1. In der Stadionübersicht **S1 / anderen Block als Klickziel wählen** anklicken und dann genau auf S1 klicken. Damit wird nur das spätere Klickziel gespeichert; der Block wird noch nicht geöffnet.
 2. Den **Suchbereich für einzelne Plätze** markieren: den Kartenbereich wählen, in dem nach dem Öffnen die einzelnen Platzpunkte erscheinen. Das Bedienfeld darf nicht darin liegen. Der Bereich ist kein festgelegter Sitzplatz; darin wird ein freier Punkt gesucht.
-3. Den bereits sichtbaren **Einkaufswagen** als Klickziel auswählen.
+3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet lassen.
 4. Blockklick passend einstellen; Vorgabe ist Einfachklick. Falls die Webseite den Block nur per Doppelklick öffnet, entsprechend umstellen. Die Platzauswahl bleibt auf Einfachklick.
 5. Im Testmodus werden nur die Eingaben geprüft: Der Block wird nicht geöffnet und freie Tickets werden damit nicht bestätigt.
 6. **Aktionen automatisch ausführen** aktivieren und starten. Der Wächter öffnet den gewählten Block sofort, wartet auf eine sichtbar veränderte Platzansicht und sucht dort auch bereits verfügbare farbige Platzpunkte. Erst nach dem Platzklick folgt der Einkaufswagen. Ohne bestätigten freien Punkt erfolgt kein Warenkorbklick; nach 15 Sekunden wird abgebrochen.
@@ -50,14 +62,14 @@ Bereits beim Start farbig angezeigte Verfügbarkeit wird sofort berücksichtigt.
 
 1. **Plätze bereits sichtbar** als Ansicht wählen.
 2. **Bereich mit Platzpunkten markieren:** Ein Rechteck über die relevanten Sitzpunkte ziehen. Farbige Bedienelemente, Symbole und Legenden außerhalb lassen. Das Bedienfeld darf nicht im Suchbereich liegen.
-3. **Einkaufswagen wählen:** Das sichtbare Symbol unten rechts auswählen. Dieser Auswahlklick betätigt den Warenkorb noch nicht.
+3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet lassen. Vor der Platzauswahl ist kein sichtbares Warenkorbsymbol erforderlich.
 4. **Platz wählen: Einfachklick** beibehalten.
 5. Zuerst ohne **Aktionen automatisch ausführen** starten. Der Testmodus meldet einen freien farbigen Punkt und klickt nichts an.
 6. Für die Klickfolge die automatische Ausführung aktivieren und erneut starten.
 
-Die Spielfeld-Ausschlüsse sind im Direktmodus nicht aktiv. Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter mindestens 250 ms und betätigt den gewählten Warenkorb. Ein deaktivierter Warenkorb wird bis zu drei Sekunden abgewartet. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
+Die Spielfeld-Ausschlüsse sind im Direktmodus nicht aktiv. Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter auf eine eindeutige aktive Hinzufügen-Schaltfläche und betätigt sie. Nur im optionalen manuellen Warenkorbmodus gelten mindestens 250 ms Wartezeit und bis zu drei Sekunden Warten auf Aktivierung. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
 
-**Escape**, Stoppen oder ein unsichtbarer Tab stoppen weitere Aktionen. Nach Scrollen oder Änderung der Fenstergröße müssen Suchbereiche und Einkaufswagen neu gewählt werden.
+**Escape**, Stoppen oder ein unsichtbarer Tab stoppen weitere Aktionen. Nach Scrollen oder Änderung der Fenstergröße müssen die Suchbereiche und gegebenenfalls manuell festgelegte Klickziele neu gewählt werden.
 
 ## Optional: zuerst einen Block öffnen
 
@@ -73,7 +85,7 @@ Der Wächter sucht zuerst eine farbige Fläche im Blockbereich und öffnet den B
 - Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde. Aufnahmen erfolgen mindestens 550 ms auseinander. Zwei Bilder bestätigen eine Erkennung: ungefähr 0,6–1,2 Sekunden plus Aufnahme-/Verarbeitungszeit im Direktmodus, danach die Wartezeit vor dem Warenkorb. Der Blockmodus benötigt zusätzliche Aufnahmen und Ladezeit. Keine garantierte Latenz.
 - Der Tab muss sichtbar bleiben. Die Seite wird nicht selbst neu geladen. Der Wächter sieht nur die vom Shop im Browser angezeigte Verfügbarkeit.
 - Synthetische Mausereignisse werden nicht von jedem Shop akzeptiert. Ein Klick ist kein Nachweis einer erfolgreichen Platzauswahl oder Reservierung. Das tatsächliche Ergebnis bitte im Shop prüfen.
-- Der ausgewählte Warenkorb muss sichtbar bleiben und als Seitenelement erhalten sein. Erscheint er erst nach der Platzauswahl oder wird er ersetzt, benötigt das eine Integration für die konkrete Seite. Ein verändertes Ziel wird nicht blind angeklickt.
+- Die automatische Hinzufügen-Suche setzt eine unterstützte Beschriftung im zugänglichen Seitendokument voraus. Im optionalen manuellen Modus muss das ausgewählte Warenkorbelement erhalten bleiben; geänderte Ziele werden nicht blind angeklickt.
 - Ein Blockwechsel mit Navigation zu einer neuen Seite, Scrollen oder Größenänderung beendet den Ablauf. Eingebettete Frames benötigen zusätzliche Integration.
 - Im Blockmodus erfordert der Ansichtswechsel mindestens 24 veränderte Pixel (RGB-Kanaldifferenz über 24) und mindestens 2 % Veränderung im Platzsuchbereich. Animationen sind kein verlässlicher Nachweis eines bestimmten Shopzustands.
 - Checkout und Zahlung werden nicht automatisiert.
@@ -93,6 +105,6 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, automatische Suche des SVG-Blocknamens S1, fehlende und mehrdeutige Blocknamen, gezielter grauer Block ohne Farbsignal, kein Warenkorbklick ohne freien Punkt, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
+Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, automatische Suche des SVG-Blocknamens S1, fehlende und mehrdeutige Blocknamen, gezielter grauer Block ohne Farbsignal, kein Warenkorbklick ohne freien Punkt, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Zusätzlich wird die dynamische Hinzufügen-Suche mit späterem Erscheinen/Aktivieren und DOM-Ersetzung, mehreren Zielen, verdeckten Schaltflächen, zugänglichen Icon-Beschriftungen, Abbruch und dem vollständigen Ablauf ohne vorab vorhandenes Warenkorbziel getestet. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
 
 Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen.

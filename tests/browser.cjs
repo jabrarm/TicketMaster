@@ -25,8 +25,9 @@ const assert=require('node:assert/strict');
     });
     await page.exposeFunction('captureForTest',async()=>({data:`data:image/png;base64,${(await page.screenshot()).toString('base64')}`}));
     await page.evaluate(()=>window.chrome={runtime:{sendMessage:()=>captureForTest()}});
-    for(const file of ['detector.js','content.js'])await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../extension',file),'utf8')});
+    for(const file of ['detector.js','cart.js','content.js'])await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../extension',file),'utf8')});
     const host=page.locator('#tm-watcher-host');
+    await host.locator('#autoCart').uncheck();
     await host.locator('#mode').selectOption('blocks');
     for(const id of ['area','seats']){
       await host.locator('#'+id).click();await page.mouse.move(75,75);await page.mouse.down();await page.mouse.move(415,345);await page.mouse.up();

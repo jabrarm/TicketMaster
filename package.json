@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node tests/detector.test.cjs && node tests/background.test.cjs",
-    "test:browser": "node tests/browser.cjs"
+    "test": "node tests/detector.test.cjs && node tests/background.test.cjs && node tests/cart.test.cjs",
+    "test:browser": "node tests/browser.cjs && node tests/cart.browser.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
