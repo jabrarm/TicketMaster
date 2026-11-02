@@ -43,7 +43,7 @@ const source=file=>fs.readFileSync(path.join(__dirname,'../extension',file),'utf
     });
     await page.exposeFunction('captureForTest',async()=>({data:`data:image/png;base64,${(await page.screenshot()).toString('base64')}`}));
     await page.evaluate(()=>window.chrome={runtime:{sendMessage:()=>captureForTest()}});
-    for(const file of ['detector.js','cart.js','content.js'])await page.addScriptTag({content:source(file)});
+    for(const file of ['detector.js','cart.js','zoom.js','content.js'])await page.addScriptTag({content:source(file)});
     const host=page.locator('#tm-watcher-host');
     await host.locator('#mode').selectOption('direct');
     assert.equal(await host.locator('#autoCart').isChecked(),true);

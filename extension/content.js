@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   if (document.getElementById('tm-watcher-host')) return;
   const host = document.createElement('div');
   host.id = 'tm-watcher-host';
@@ -15,23 +15,33 @@
   <button id="area">1 · Bereich der Blöcke markieren</button>
   <button id="seats">2 · Suchbereich für einzelne Plätze markieren</button>
   <label><input id="autoCart" type="checkbox" checked> Hinzufügen-Schaltfläche automatisch finden</label>
+  <button id="learnCart">Hinzufügen-Symbol einmal einlernen</button>
+  <button id="forgetCart">Gelerntes Warenkorbziel löschen</button>
   <button id="next">3 · Einkaufswagen wählen</button>
   <button id="exclude">Spielfeld / Legende aus der Suche ausschließen</button>
   <button id="clearExcluded">Ausschlüsse löschen (0)</button>
   <label id="blockClickLabel">Block öffnen <select id="blockClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label>Platz wählen <select id="seatClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
+  <label><input id="autoZoom" type="checkbox" checked> Ohne freien Punkt: Kartenzoom versuchen (max. 3)</label>
   <label><input id="automatic" type="checkbox"> Aktionen automatisch ausführen</label>
   <button id="start">Überwachung starten</button><button id="stop" disabled>Stoppen</button>
   <output role="status" aria-live="polite">Markiere den Platzsuchbereich. Die Hinzufügen-Schaltfläche wird erst nach der Platzauswahl gesucht.</output>
   <small>Auch bestehende Verfügbarkeit wird geprüft. Testmodus klickt nicht. In der Gesamtübersicht das Spielfeld und farbige Symbole ausschließen. Escape stoppt jederzeit.</small></section>`;
   const $ = id => root.getElementById(id);
-  const controls = ['area','blockTarget','blockName','seats','next','autoCart','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
+  const controls = ['area','blockTarget','blockName','seats','next','autoCart','autoZoom','learnCart','forgetCart','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
   const labels = {area:'1 · Bereich der Blöcke markieren',seats:'2 · Suchbereich für einzelne Plätze markieren',next:'3 · Einkaufswagen wählen'};
   const regions = {};
   const exclusions = [];
   let cart, blockTarget, runAbort, running = false, generation = 0, lastCapture = 0, cleanupSelection;
+  let learnedSelector='';
+  const storageKey=`tm-cart-selector:${location.origin}${location.pathname}`;
   const say = text => root.querySelector('output').textContent = text;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  try {
+    const saved=await chrome.storage?.local?.get(storageKey);
+    learnedSelector=typeof saved?.[storageKey]==='string' ? saved[storageKey] : '';
+    if(learnedSelector) $('learnCart').textContent='Hinzufügen-Symbol gelernt ✓ · neu einlernen';
+  } catch {say('Gespeichertes Warenkorbziel konnte nicht geladen werden. Bitte bei Bedarf neu einlernen.');}
   function updateMode() {
     const blocks = $('mode').value === 'blocks';
     const target = $('mode').value === 'target';
@@ -58,22 +68,38 @@
     stop(); host.style.visibility = 'hidden';
     const veil = document.createElement('div'), box = document.createElement('div'), hint = document.createElement('div');
     veil.className = 'veil'; box.className = 'box'; hint.className = 'hint';
-    hint.textContent = kind === 'blockTarget' ? 'In der Übersicht einmal auf Block S1 (oder den gewünschten Block) zeigen und klicken · wählt nur das Ziel' : kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : kind === 'exclude' ? 'Spielfeld oder farbiges Symbol mit Rechteck ausschließen · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
+    hint.textContent = kind === 'learnCart' ? 'Auf das sichtbare Warenkorb-plus-Symbol klicken · nur einlernen, nicht betätigen · Escape: Abbrechen' : kind === 'blockTarget' ? 'In der Übersicht einmal auf Block S1 (oder den gewünschten Block) zeigen und klicken · wählt nur das Ziel' : kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : kind === 'exclude' ? 'Spielfeld oder farbiges Symbol mit Rechteck ausschließen · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
     root.append(veil, box, hint);
     [veil, box, hint].forEach(el => el.style.visibility = 'visible');
     cleanupSelection = () => { veil.remove(); box.remove(); hint.remove(); host.style.visibility = ''; cleanupSelection = undefined; };
     let origin;
     veil.onpointerdown = event => { event.preventDefault(); origin = {x:event.clientX,y:event.clientY}; veil.setPointerCapture(event.pointerId); };
     veil.onpointermove = event => {
-      if (!origin || kind === 'next' || kind === 'blockTarget') return;
+      if (!origin || kind === 'next' || kind === 'blockTarget' || kind === 'learnCart') return;
       Object.assign(box.style, {left:`${Math.min(origin.x,event.clientX)}px`,top:`${Math.min(origin.y,event.clientY)}px`,width:`${Math.abs(origin.x-event.clientX)}px`,height:`${Math.abs(origin.y-event.clientY)}px`});
     };
-    veil.onpointerup = event => {
+    veil.onpointerup = async event => {
       event.preventDefault(); event.stopPropagation(); if (!origin) return;
       const point = {x:event.clientX,y:event.clientY};
       const rect = {x:Math.min(origin.x,point.x),y:Math.min(origin.y,point.y),width:Math.abs(origin.x-point.x),height:Math.abs(origin.y-point.y)};
       cleanupSelection();
-      if (kind === 'blockTarget') {
+      if (kind === 'learnCart') {
+        try {
+          const picked=document.elementFromPoint(point.x,point.y);
+          let element=picked?.closest('button,a,[role="button"],[onclick],input[type="button"],input[type="submit"]');
+          if(!element) for(let candidate=picked;candidate && candidate!==document.body;candidate=candidate.parentElement) {
+            if(getComputedStyle(candidate).cursor==='pointer'){element=candidate;break;}
+          }
+          if(!element || element===host) throw new Error('Kein erkennbares Bedienelement getroffen. Bitte genau auf den Knopf klicken.');
+          const selector=TicketCart.selectorFor(element);
+          const storage=chrome.storage?.local;
+          if(storage) await storage.set({[storageKey]:selector});
+          learnedSelector=selector;
+          $('learnCart').textContent='Hinzufügen-Symbol gelernt ✓ · neu einlernen';
+          say(storage ? 'Hinzufügen-Ziel für diese Shopseite gespeichert. Es darf bei späteren Starts zunächst fehlen.' : 'Hinzufügen-Ziel für diese Sitzung gelernt. Dauerhaftes Speichern ist hier nicht verfügbar.');
+        } catch(error){say(`Einlernen fehlgeschlagen: ${error.message}`);}
+        return;
+      } else if (kind === 'blockTarget') {
         blockTarget = {...point, element:document.elementFromPoint(point.x,point.y)};
         $('blockTarget').textContent = '1 · Blockziel gewählt ✓';
         say('Blockziel gespeichert. Es wird beim automatischen Start geöffnet, unabhängig von seiner Farbe.');
@@ -150,8 +176,9 @@
     if (!matches.length) throw new Error(`Block ${name} nicht automatisch gefunden. Für diese Plandarstellung ist eine Anpassung nötig; alternativ das Blockziel einmalig auswählen.`);
     return matches[0];
   }
-  async function find(token, rect, color, seat, priorScene) {
+  async function find(token, rect, color, seat, priorScene, allowZoom = false) {
     let previous, changed = !priorScene;
+    let zooms=0,misses=0;
     const deadline = seat && priorScene ? Date.now()+15000 : Infinity;
     while (active(token)) {
       if (Date.now()>deadline) throw new Error('Keine bestätigte Platzansicht mit freiem Platz erkannt. Kein Warenkorbklick.');
@@ -164,6 +191,18 @@
       changed = changed || different;
       const point = changed && TicketDetector.findAvailable(frame.data,frame.width,frame.height,color,seat);
       if (!point) say(seat ? 'Suche vorhandene und neue freie Platzpunkte … Noch kein passender Punkt erkannt.' : 'Blockübersicht: kein farbiger Verfügbarkeitshinweis im Suchbereich erkannt. Auch vorhandene Tickets werden geprüft.');
+      if(seat && !point && allowZoom && ++misses>=2 && zooms<3) {
+        const zoom=TicketZoom.findZoomIn(host);
+        if(zoom) {
+          if(!active(token)) return null;
+          say(`Kein freier Punkt erkannt · Kartenzoom ${++zooms}/3 …`);
+          click(zoom,false); previous=null;misses=0;
+          await sleep(250);
+          continue;
+        }
+        say('Kein freier Punkt erkannt. Keine eindeutige Karten-Zoomsteuerung gefunden; es wird weiter ohne Zoom gesucht.');
+      }
+      if(point) misses=0;
       if (point && previous && Math.hypot(point.x-previous.x,point.y-previous.y)<5) return {x:rect.x+point.x,y:rect.y+point.y};
       previous = point;
     }
@@ -171,6 +210,13 @@
   }
   $('area').onclick=()=>select('area'); $('seats').onclick=()=>select('seats'); $('next').onclick=()=>select('next');
   $('blockTarget').onclick=()=>select('blockTarget');
+  $('learnCart').onclick=()=>select('learnCart');
+  $('forgetCart').onclick=async()=>{
+    try {
+      await chrome.storage?.local?.remove(storageKey);
+      learnedSelector='';$('learnCart').textContent='Hinzufügen-Symbol einmal einlernen';say('Gelerntes Ziel gelöscht. Automatische Text- und Symbolsuche ist aktiv.');
+    }catch{say('Gespeichertes Ziel konnte nicht gelöscht werden.');}
+  };
   $('exclude').onclick=()=>select('exclude');
   $('clearExcluded').onclick=()=>{exclusions.length=0;$('clearExcluded').textContent='Ausschlüsse löschen (0)';say('Ausschlüsse gelöscht.');};
   $('stop').onclick=()=>stop();
@@ -182,6 +228,7 @@
     if (targeted && !blockTarget) return say('Wähle zuerst S1 oder einen anderen Block als Klickziel.');
     const automatic=$('automatic').checked;
     const autoCart=$('autoCart').checked;
+    const autoZoom=$('autoZoom').checked;
     if (automatic && !autoCart && !cart) return say('Wähle den Einkaufswagen oder aktiviere die automatische Schaltflächensuche.');
     const panel=host.getBoundingClientRect();
     for (const rect of blocks ? Object.values(regions) : [regions.seats]) {
@@ -207,10 +254,10 @@
         say('Block wird geöffnet · warte auf freie Plätze …');
         click(block,blockDouble);
         if (!active(token)) return;
-        seat=await find(token,regions.seats,null,true,before);
+        seat=await find(token,regions.seats,null,true,before,autoZoom);
       } else {
         // No scene replacement is needed when the individual places are visible.
-        seat=await find(token,regions.seats,null,true);
+        seat=await find(token,regions.seats,null,true,undefined,automatic && autoZoom);
       }
       if (!seat || !active(token)) return;
       if (!automatic) return stop('Freier farbiger Platz erkannt. Keine Klicks ausgeführt.');
@@ -219,9 +266,9 @@
       if (!active(token)) return;
       if (autoCart) {
         say('Platz angeklickt · warte auf aktive Hinzufügen-Schaltfläche …');
-        const found=await TicketCart.waitForAction({signal:runAbort.signal,exclude:host});
+        const found=await TicketCart.waitForAction({signal:runAbort.signal,exclude:host,selector:learnedSelector});
         if (!active(token)) return;
-        const current=TicketCart.findActions(host);
+        const current=TicketCart.findActions(host,learnedSelector);
         if (current.length!==1 || current[0].element!==found.element) throw new Error('Hinzufügen-Ziel hat sich geändert. Kein Warenkorbklick.');
         click(current[0],false);
         if (active(token)) stop('Platz angeklickt → Hinzufügen-Schaltfläche betätigt. Ergebnis bitte auf der Seite prüfen.');

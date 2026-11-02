@@ -1,7 +1,7 @@
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id || !/^https?:/.test(tab.url || '')) return;
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['detector.js', 'cart.js', 'content.js'] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['detector.js', 'cart.js', 'zoom.js', 'content.js'] });
   } catch (error) {
     console.error('Bereichswächter konnte nicht geöffnet werden:', error.message);
   }

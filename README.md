@@ -9,6 +9,29 @@ Chrome-/Edge-Erweiterung: **Runden farbigen Platzpunkt erkennen → einmal auf d
 3. Zum Aktualisieren den bisherigen Erweiterungsordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Anschließend auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
 4. Die vollständig geladene Ticketseite öffnen und das Erweiterungssymbol anklicken.
 
+## Neu: Warenkorb-plus-Symbol und Einlernen
+
+Zusätzlich zu Textbeschriftungen erkennt die Suche eindeutige Symbolmerkmale wie `fa-cart-plus`, `data-icon="cart-plus"` oder einen SVG-Verweis auf `cart-plus`. Ein bloßes Einkaufswagensymbol ohne Plus wird nicht automatisch als Hinzufügen-Aktion behandelt.
+
+Falls der Knopf ausschließlich aus unbeschrifteten SVG-Pfaden besteht, kann er einmalig eingelernt werden:
+
+1. Manuell einen Platz auswählen, sodass der auf dem Screenshot gezeigte Warenkorb-plus-Knopf erscheint.
+2. Im Wächter **Hinzufügen-Symbol einmal einlernen** wählen und auf diesen Knopf klicken. Der Lernklick betätigt den Knopf nicht.
+3. Der Wächter speichert ein eindeutiges Merkmal des Bedienelements, zum Beispiel dessen ID oder einen eindeutigen Klassenselektor. Bei späteren Starts darf der Knopf zunächst fehlen oder durch ein neues Element mit demselben Merkmal ersetzt werden. Er wird erst nach einem automatischen Platzklick gesucht.
+4. Über **Gelerntes Warenkorbziel löschen** wird die gespeicherte Zuordnung entfernt. Die normale Text-/Symbolsuche greift dann wieder.
+
+Die Zuordnung gilt für die jeweilige Shopadresse (Origin und Pfad, ohne URL-Parameter). Gespeichert wird nur der CSS-Selektor, kein Screenshot und keine Zugangsdaten. Gibt es kein eindeutiges Merkmal, wird das Einlernen abgelehnt. Der gelernte Selektor hat Vorrang; bei einem nicht mehr passenden Ziel wird nicht auf einen anderen Knopf ausgewichen. Die tatsächliche Klickfunktion im Shop muss weiterhin geprüft werden.
+
+## Neu: zu kleine Platzpunkte und Kartenzoom
+
+In der Gesamtübersicht sind einzelne Platzpunkte häufig nicht ausreichend dargestellt. Ein vergrößertes Screenshotbild stellt keine fehlenden Informationen wieder her. Deshalb kann der Wächter jetzt die **Karte selbst** über eine sichtbare, aktive und eindeutig zugeordnete Zoom-in-Schaltfläche vergrößern.
+
+**Ohne freien Punkt: Kartenzoom versuchen (max. 3)** ist standardmäßig aktiv. Nach zwei Aufnahmen ohne erkannten freien Platzpunkt wird ein Zoomschritt versucht. Danach beginnt die Bestätigung eines Platzpunkts erneut. Höchstens drei Schritte pro Suchlauf sind erlaubt; der Testmodus zoomt nicht. Im Blockmodus beginnt dies erst nach einem erkannten Ansichtswechsel, im Direktmodus nur bei automatischer Ausführung.
+
+Erkannt werden Beschriftungen wie **Zoom in**, **Vergrößern**, **Karte vergrößern** und entsprechende Zoom-in-/search-plus-Symbolmerkmale. Ein unbeschriftetes **+** oder eine Mengensteuerung wird ausdrücklich nicht verwendet. Fehlt eine eindeutige Zoomsteuerung, wird ohne Zoom weitergesucht und dies angezeigt. Die konkrete Kartensteuerung im echten Shop ist noch nicht geprüft. Eine Karte, die nur per Mausrad oder Gesten zoomt, benötigt eine eigene Integration.
+
+Den Platzsuchbereich über dem gesamten relevanten Kartenbereich markieren, damit vergrößerte Punkte im Ausschnitt bleiben. Internes Kartenzoomen ist vom Browserzoom zu unterscheiden. Scrollt oder verändert die Seite beim Zoomen das Browserlayout, wird aus Sicherheitsgründen gestoppt; anschließend sind die Koordinaten neu zu wählen. Auch Kartenanimationen oder mehr als drei benötigte Zoomschritte können eine automatische Platzauswahl verhindern. Die automatische Erkennung aller verfügbaren Blöcke bleibt unabhängig davon noch ungeprüft.
+
 ## Hinzufügen-Schaltfläche erst nach Platzauswahl finden
 
 Standard ist **Hinzufügen-Schaltfläche automatisch finden**. Du musst keinen Warenkorbbereich vorab markieren; die Schaltfläche darf am Anfang vollständig fehlen.
@@ -17,7 +40,7 @@ Nach dem Platzklick sucht der Wächter anhand von sichtbarem Text, `aria-label`,
 
 Die Schaltfläche muss sichtbar, im aktuellen Bildausschnitt, nicht verdeckt und aktiv sein. Ein später ersetztes Element wird neu gesucht. Nur ein eindeutiger Treffer wird angeklickt. Bei mehreren aktiven passenden Zielen oder nach acht Sekunden ohne eindeutigen aktiven Treffer wird abgebrochen. Escape/Stoppen beendet auch diese Wartephase. Reine Links zum Anzeigen des Warenkorbs und Checkout-Schaltflächen zählen nicht als Hinzufügen-Aktion.
 
-Die automatische Suche ist lokal getestet, aber noch nicht gegen den echten Shop geprüft. Ein ausschließlich gezeichnetes oder unbeschriftetes Icon, ein geschlossenes Shadow DOM oder ein eingebetteter Frame werden damit nicht zuverlässig erkannt. Ein beliebiges „Hinzufügen“ ohne Bezug zum Warenkorb wird nicht geraten. Dafür muss die tatsächliche Seitenschaltfläche integriert werden, sobald Zugriff auf die Seite möglich ist.
+Die automatische Suche ist lokal getestet, aber noch nicht gegen den echten Shop geprüft. Ein ausschließlich gezeichnetes oder unbeschriftetes Icon ohne eindeutiges Symbolmerkmal benötigt das oben beschriebene Einlernen. Geschlossene Shadow DOMs und eingebettete Frames werden nicht unterstützt. Ein beliebiges „Hinzufügen“ ohne Bezug zum Warenkorb wird nicht geraten. Dafür muss die tatsächliche Seitenschaltfläche integriert werden, sobald Zugriff auf die Seite möglich ist.
 
 Optional kann die automatische Schaltflächensuche abgeschaltet und ein bereits sichtbares Warenkorbziel manuell gewählt werden. Dieser ältere Modus ist nur geeignet, wenn das Element während des Ablaufs erhalten bleibt.
 
@@ -92,7 +115,7 @@ Der Wächter sucht zuerst eine farbige Fläche im Blockbereich und öffnet den B
 
 ## Datenschutz
 
-Nur `activeTab` und `scripting`; Zugriff erfolgt nach Klick auf das Erweiterungssymbol. Aufnahmen werden lokal im Arbeitsspeicher verarbeitet und weder gespeichert noch an einen Server übertragen. Es werden keine Zugangsdaten benötigt.
+`activeTab` und `scripting` erlauben den Zugriff nach Klick auf das Erweiterungssymbol. `storage` speichert ausschließlich ein ausdrücklich eingelerntes Warenkorbziel lokal für die jeweilige Shopseite. Aufnahmen bleiben im Arbeitsspeicher und werden weder gespeichert noch an einen Server übertragen. Es werden keine Zugangsdaten benötigt.
 
 ## Entwickeln und testen
 
@@ -105,6 +128,6 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, automatische Suche des SVG-Blocknamens S1, fehlende und mehrdeutige Blocknamen, gezielter grauer Block ohne Farbsignal, kein Warenkorbklick ohne freien Punkt, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Zusätzlich wird die dynamische Hinzufügen-Suche mit späterem Erscheinen/Aktivieren und DOM-Ersetzung, mehreren Zielen, verdeckten Schaltflächen, zugänglichen Icon-Beschriftungen, Abbruch und dem vollständigen Ablauf ohne vorab vorhandenes Warenkorbziel getestet. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
+Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, automatische Suche des SVG-Blocknamens S1, fehlende und mehrdeutige Blocknamen, gezielter grauer Block ohne Farbsignal, kein Warenkorbklick ohne freien Punkt, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Zusätzlich wird die dynamische Hinzufügen-Suche mit späterem Erscheinen/Aktivieren und DOM-Ersetzung, mehreren Zielen, verdeckten Schaltflächen, zugänglichen Icon-Beschriftungen, Abbruch und dem vollständigen Ablauf ohne vorab vorhandenes Warenkorbziel getestet. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Zusätzliche Browsertests prüfen cart-plus-Icons ohne Beschriftung, Einlernen ohne echten Klick, Wiedererkennen nach DOM-Ersetzung, die Abgrenzung von Ticketmengen-Plus und Kartenzoom sowie maximal drei Zoomschritte bei zu kleinen Punkten. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
 
 Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen.

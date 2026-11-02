@@ -23,13 +23,22 @@
     const top = document.elementFromPoint(point.x, point.y);
     return top && element.contains(top) ? { ...point, element } : null;
   }
-  function findActions(exclude) {
+  function iconAddsToCart(element) {
+    const icons = [element, ...element.querySelectorAll('[class],[data-icon],use,img,[title],[aria-label]')];
+    return icons.some(icon => {
+      const identifiers = [icon.getAttribute('class'), icon.getAttribute('data-icon'), icon.getAttribute('href'), icon.getAttribute('xlink:href'), icon.getAttribute('alt'), icon.getAttribute('title'), icon.getAttribute('aria-label')].filter(Boolean).join(' ');
+      return /(?:^|[\s#/:])(?:fa-|fas-|far-|mdi-|bi-|icon-)?(?:cart-plus|cart-plus-fill|cart-arrow-down|add-shopping-cart|shopping-cart-add|cart-add|shopping-cart-plus)(?=$|[\s.#/?])/i.test(identifiers)
+        || isAddAction(identifiers);
+    });
+  }
+  function findActions(exclude, selector = '') {
     const matches = [];
-    for (const element of document.querySelectorAll('button,a,[role="button"],input[type="button"],input[type="submit"]')) {
+    const elements = document.querySelectorAll(selector || 'button,a,[role="button"],[onclick],input[type="button"],input[type="submit"]');
+    for (const element of elements) {
       if (element === exclude || exclude?.contains(element)) continue;
       const labelled = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
       const labels = [element.getAttribute('aria-label'), element.getAttribute('title'), labelled, element.textContent, element.value];
-      if (!labels.some(isAddAction)) continue;
+      if (!selector && !labels.some(isAddAction) && !iconAddsToCart(element)) continue;
       const point = pointFor(element);
       if (!point) continue;
       // Nested role=button nodes describe one target, not two alternatives.
@@ -40,7 +49,28 @@
     }
     return matches;
   }
-  function waitForAction({ signal, timeout = 8000, exclude } = {}) {
+  function selectorFor(element) {
+    if (!element?.isConnected) throw new Error('Die Schaltfläche ist nicht mehr vorhanden.');
+    const unique = selector => {const matches=document.querySelectorAll(selector);return matches.length===1 && matches[0]===element;};
+    if (element.id) {
+      const selector = `#${CSS.escape(element.id)}`;
+      if (unique(selector)) return selector;
+    }
+    for (const attribute of ['data-testid','data-test','name','aria-label','title']) {
+      const value=element.getAttribute(attribute);
+      if (value) {
+        const selector=`${element.localName}[${attribute}="${CSS.escape(value)}"]`;
+        if (unique(selector)) return selector;
+      }
+    }
+    const classes=[...element.classList].filter(name=>!/^(?:active|selected|disabled|enabled|hover|focus|is-active|is-disabled)$/.test(name));
+    if(classes.length) {
+      const selector=element.localName+classes.map(name=>`.${CSS.escape(name)}`).join('');
+      if(unique(selector)) return selector;
+    }
+    throw new Error('Kein eindeutiges dauerhaftes Merkmal gefunden. Die Schaltfläche muss an die echte Seite angepasst werden.');
+  }
+  function waitForAction({ signal, timeout = 8000, exclude, selector = '' } = {}) {
     return new Promise((resolve, reject) => {
       let done = false, observer, interval, timer;
       function finish(error, value) {
@@ -53,7 +83,7 @@
       function check() {
         if (signal?.aborted) return abort();
         try {
-          const matches = findActions(exclude);
+          const matches = findActions(exclude, selector);
           if (matches.length > 1) return finish(new Error('Mehrere aktive Hinzufügen-Schaltflächen gefunden. Kein Warenkorbklick.'));
           if (matches.length === 1) finish(null, matches[0]);
         } catch (error) { finish(error); }
@@ -66,6 +96,6 @@
       check();
     });
   }
-  globalThis.TicketCart = { isAddAction, findActions, pointFor, waitForAction };
+  globalThis.TicketCart = { isAddAction, findActions, pointFor, selectorFor, waitForAction };
   if (typeof module !== 'undefined') module.exports = { isAddAction };
 })();
