@@ -1,16 +1,11 @@
-<!doctype html>
-<html lang="de"><meta charset="utf-8"><title>Bereichswächter · Testseite</title>
-<style>
-body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:60px;max-width:600px}h1{font-size:34px}button{font:inherit;padding:12px 20px;border:0;border-radius:12px;background:#173d29;color:white;cursor:pointer}.seat{width:240px;height:18px;margin:24px 0;background:rgb(235,235,235);border-radius:12px}#cart{position:fixed;bottom:40px;right:40px}output{display:block;margin-top:24px}
-</style>
-<h1>Ein Platz wird verfügbar.</h1><p>Markiere mit der Erweiterung eine graue Linie und wähle den Einkaufswagen unten rechts. Starte den Testmodus und löse dann die Farbänderung aus.</p>
-<div class="seat"></div><div class="seat" id="target"></div><div class="seat"></div>
-<button id="change">Farbänderung in 2 Sekunden</button><button id="reset">Zurücksetzen</button>
-<button id="cart">🛒 Einkaufswagen</button><output id="log">Noch keine Klickfolge.</output>
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Test · Block → Platz → Warenkorb</title>
+<style>body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:40px;max-width:600px}#plan{position:relative;width:400px;height:280px;background:#eee;border-radius:12px}#block{position:absolute;left:50px;top:50px;width:100px;height:70px;background:#6c7400;border:0;border-radius:10px;color:white;cursor:pointer}#seat{display:none;position:absolute;left:180px;top:140px;width:18px;height:18px;background:#6c7400;border-radius:50%;cursor:pointer}#cart{position:fixed;right:35px;bottom:35px}button{font:inherit;padding:10px;margin:12px 0}output{display:block;margin-top:20px}</style>
+<h1>Block → Platz → Warenkorb</h1><p>Markiere die Karte als Blockbereich und Platzsuchbereich. Wähle den Warenkorb unten rechts. Olivgrün signalisiert Verfügbarkeit.</p>
+<div id="plan"><button id="block">Block</button><div id="seat"></div></div><button id="reset">Zurücksetzen</button><button id="cart" disabled>🛒 Warenkorb</button><output id="log">Warte auf Blockklick.</output>
 <script>
-let selected=false;
-document.querySelector('#change').onclick=()=>setTimeout(()=>document.querySelector('#target').style.background='#6c7400',2000);
-document.querySelector('#reset').onclick=()=>{selected=false;document.querySelector('#target').style.background='rgb(235,235,235)';document.querySelector('#log').textContent='Noch keine Klickfolge.'};
-document.querySelector('#target').ondblclick=()=>{selected=true;document.querySelector('#log').textContent='Doppelklick erkannt.'};
-document.querySelector('#cart').onclick=()=>document.querySelector('#log').textContent=selected?'Erfolg: Doppelklick → Einkaufswagen.':'Einkaufswagen ohne vorherigen Doppelklick.';
+const $=id=>document.getElementById(id);
+$('block').onclick=()=>{$('block').style.display='none';$('seat').style.display='block';$('plan').style.background='#d9e4e2';$('log').textContent='Block geöffnet. Warte auf Platzauswahl.'};
+$('seat').onclick=()=>{$('seat').style.background='#1766bb';$('cart').disabled=false;$('log').textContent='Platz gewählt. Warte auf Warenkorb.'};
+$('cart').onclick=()=>{$('cart').disabled=true;$('log').textContent='Test erfolgreich: Block → Platz → Warenkorb.'};
+$('reset').onclick=()=>{$('block').style.display='block';$('seat').style.display='none';$('seat').style.background='#6c7400';$('plan').style.background='#eee';$('cart').disabled=true;$('log').textContent='Warte auf Blockklick.'};
 </script></html>

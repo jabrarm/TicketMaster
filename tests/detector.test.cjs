@@ -20,3 +20,17 @@ test('small rendering fluctuations and isolated changed pixels are ignored', () 
   const changed = baseline.slice(); changed[0] = 0;
   assert.equal(detectChange(baseline, changed, 24, 24), null);
 });
+const {findAvailable,sceneChanged}=require('../extension/detector.js');
+test('already colored availability is detected without a gray reference',()=>{
+  assert.ok(findAvailable(frame([108,116,0]),24,24,'#6c7400'));
+  assert.equal(findAvailable(frame([235,235,235]),24,24,'#6c7400'),null);
+});
+test('seat search rejects large block shapes and accepts small seat shapes',()=>{
+  const color=Uint8ClampedArray.from(Array.from({length:100*100},()=>[108,116,0,255]).flat());
+  assert.equal(findAvailable(color,100,100,'#6c7400',true),null);
+  assert.ok(findAvailable(frame([108,116,0]),24,24,'#6c7400',true));
+});
+test('seat search requires actual scene replacement',()=>{
+  assert.equal(sceneChanged(frame([235,235,235]),frame([235,235,235])),false);
+  assert.equal(sceneChanged(frame([235,235,235]),frame([100,110,0])),true);
+});

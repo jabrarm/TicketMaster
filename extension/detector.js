@@ -22,6 +22,42 @@
     return best && best.count >= minimum
       ? { x: best.x / best.count, y: best.y / best.count, count: best.count } : null;
   }
-  globalThis.TicketDetector = { detectChange };
-  if (typeof module !== 'undefined') module.exports = { detectChange };
+  function findAvailable(data, width, height, hex, seat = false) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('Ungültige Verfügbarkeitsfarbe.');
+    const color = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const mask = new Uint8Array(width * height);
+    for (let p = 0; p < mask.length; p++) {
+      const i = p * 4;
+      mask[p] = Math.max(...color.map((v, c) => Math.abs(v - data[i + c]))) <= 35 ? 1 : 0;
+    }
+    const candidates = [];
+    for (let p = 0; p < mask.length; p++) {
+      if (!mask[p]) continue;
+      const queue = [p]; mask[p] = 0;
+      let sx = 0, sy = 0, minX = width, maxX = 0, minY = height, maxY = 0;
+      for (let q = 0; q < queue.length; q++) {
+        const n = queue[q], x = n % width, y = Math.floor(n / width);
+        sx += x; sy += y; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        for (const adjacent of [x > 0 ? n - 1 : -1, x + 1 < width ? n + 1 : -1, y > 0 ? n - width : -1, y + 1 < height ? n + width : -1]) {
+          if (adjacent >= 0 && mask[adjacent]) { mask[adjacent] = 0; queue.push(adjacent); }
+        }
+      }
+      const w = maxX - minX + 1, h = maxY - minY + 1;
+      if (queue.length < 12 || (seat && (w > 48 || h > 48 || w / h > 2.5 || h / w > 2.5))) continue;
+      // Choose a matching pixel nearest the centroid (also safe for hollow shapes).
+      const cx = sx / queue.length, cy = sy / queue.length;
+      const nearest = queue.reduce((a, b) => Math.hypot(a % width - cx, Math.floor(a / width) - cy) <= Math.hypot(b % width - cx, Math.floor(b / width) - cy) ? a : b);
+      candidates.push({ x: nearest % width, y: Math.floor(nearest / width), count: queue.length });
+    }
+    return candidates.sort((a, b) => a.y - b.y || a.x - b.x)[0] || null;
+  }
+  function sceneChanged(before, after) {
+    let changed = 0;
+    for (let i = 0; i < before.length; i += 4) {
+      if (Math.max(...[0, 1, 2].map(c => Math.abs(before[i + c] - after[i + c]))) > 40) changed++;
+    }
+    return changed >= Math.max(24, before.length / 4 * 0.02);
+  }
+  globalThis.TicketDetector = { detectChange, findAvailable, sceneChanged };
+  if (typeof module !== 'undefined') module.exports = globalThis.TicketDetector;
 })();
