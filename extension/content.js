@@ -178,29 +178,52 @@
   }
   async function find(token, rect, color, seat, priorScene, allowZoom = false) {
     let previous, changed = !priorScene;
-    let zooms=0,misses=0;
+    let zooms=0,misses=0,zoomReference,zoomWait=0,zoomFailure='';
     const deadline = seat && priorScene ? Date.now()+15000 : Infinity;
     while (active(token)) {
       if (Date.now()>deadline) throw new Error('Keine bestätigte Platzansicht mit freiem Platz erkannt. Kein Warenkorbklick.');
       const frame = await capture(token,rect,!seat);
       if (!frame || !active(token)) return null;
+      if(zoomReference) {
+        if(!TicketDetector.sceneChanged(zoomReference,frame.data,0)) {
+          previous=null;
+          if(++zoomWait<2) continue;
+          allowZoom=false;zoomReference=undefined;
+          zoomFailure='Kein sichtbarer Effekt des Kartenzooms. Weitere Zoomversuche sind deaktiviert.';
+          say(zoomFailure);
+          continue;
+        }
+        zoomReference=undefined;zoomWait=0;
+      }
       // Wait for actual content replacement after the block click. A colored
       // block in the old overview is not evidence of an individual free seat.
       const different = !priorScene || TicketDetector.sceneChanged(priorScene.data,frame.data);
       if (!different) {previous=null; continue;}
       changed = changed || different;
       const point = changed && TicketDetector.findAvailable(frame.data,frame.width,frame.height,color,seat);
-      if (!point) say(seat ? 'Suche vorhandene und neue freie Platzpunkte … Noch kein passender Punkt erkannt.' : 'Blockübersicht: kein farbiger Verfügbarkeitshinweis im Suchbereich erkannt. Auch vorhandene Tickets werden geprüft.');
+      if (!point) say(seat ? `Suche vorhandene und neue freie Platzpunkte … Noch kein passender Punkt erkannt. ${zoomFailure || (zooms>=3 ? 'Drei Zoomversuche erreicht.' : '')}` : 'Blockübersicht: kein farbiger Verfügbarkeitshinweis im Suchbereich erkannt. Auch vorhandene Tickets werden geprüft.');
       if(seat && !point && allowZoom && ++misses>=2 && zooms<3) {
         const zoom=TicketZoom.findZoomIn(host);
         if(zoom) {
           if(!active(token)) return null;
           say(`Kein freier Punkt erkannt · Kartenzoom ${++zooms}/3 …`);
+          zoomReference=frame.data;zoomWait=0;
           click(zoom,false); previous=null;misses=0;
           await sleep(250);
           continue;
         }
-        say('Kein freier Punkt erkannt. Keine eindeutige Karten-Zoomsteuerung gefunden; es wird weiter ohne Zoom gesucht.');
+        const hint=TicketDetector.findAvailable(frame.data,frame.width,frame.height,null,'tiny');
+        const anchor={x:rect.x+(hint?.x ?? rect.width/2),y:rect.y+(hint?.y ?? rect.height/2)};
+        if(!active(token)) return null;
+        if(TicketZoom.wheelIn(anchor,host)) {
+          say(`Mausrad-Zoom ${++zooms}/3 im Kartenbereich · warte auf sichtbare Änderung …`);
+          zoomReference=frame.data;zoomWait=0;previous=null;misses=0;
+          await sleep(250);
+          continue;
+        }
+        allowZoom=false;
+        zoomFailure='Kein geeignetes Kartenelement für Zoom gefunden; es wird weiter ohne Zoom gesucht.';
+        say(zoomFailure);
       }
       if(point) misses=0;
       if (point && previous && Math.hypot(point.x-previous.x,point.y-previous.y)<5) return {x:rect.x+point.x,y:rect.y+point.y};

@@ -56,3 +56,9 @@ test('gray block scene transitions are recognized without reacting to minor rend
   assert.equal(sceneChanged(frame([250,250,250]),frame([217,228,226])),true);
   assert.equal(sceneChanged(frame([235,235,235]),frame([228,230,228])),false);
 });
+test('tiny colored points can anchor zoom but cannot be selected as seats',()=>{
+  const tiny=frame([255,255,255]);
+  for(let y=10;y<13;y++)for(let x=10;x<13;x++)tiny.set([163,165,108,255],(y*24+x)*4);
+  assert.ok(findAvailable(tiny,24,24,null,'tiny'));
+  assert.equal(findAvailable(tiny,24,24,null,true),null);
+});

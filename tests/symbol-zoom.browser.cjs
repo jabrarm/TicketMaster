@@ -49,10 +49,19 @@ const source=file=>fs.readFileSync(path.join(__dirname,'../extension',file),'utf
   assert.deepEqual(await page.evaluate(()=>events),['seat','learnedAdd']);
   console.log('PASS: saved target is restored after reinjection and finds an initially absent replacement button');
 
-  await page.evaluate(()=>{events=[];document.querySelector('#unlabelled').remove();Object.assign(document.querySelector('#seat').style,{width:'3px',height:'3px'});document.querySelector('#zoom').onclick=()=>events.push('zoom');});
+  await page.evaluate(()=>{events=[];document.querySelector('#unlabelled').remove();Object.assign(document.querySelector('#seat').style,{width:'3px',height:'3px'});const proof=document.createElement('div');proof.id='proof';proof.style='position:absolute;left:145px;top:145px;width:10px;height:10px;background:#eee';document.body.append(proof);document.querySelector('#zoom').onclick=()=>{events.push('zoom');proof.style.background=events.length%2?'#999':'#eee';};});
   await host.locator('#start').click();await page.waitForFunction(()=>events.length===3,null,{timeout:7000});
   await page.waitForTimeout(1400);assert.deepEqual(await page.evaluate(()=>events),['zoom','zoom','zoom']);
   await page.keyboard.press('Escape');
   console.log('PASS: zoom is bounded to three attempts and no tiny seat or cart is clicked');
+  await page.evaluate(()=>{events=[];document.querySelector('#proof').remove();document.querySelector('#zoom').remove();const map=document.createElement('div');map.id='map';map.style='position:absolute;left:90px;top:90px;width:100px;height:100px;background:white';document.body.append(map);const seat=document.querySelector('#seat');map.append(seat);seat.style.left='30px';seat.style.top='30px';map.addEventListener('wheel',event=>{event.preventDefault();events.push('wheel');Object.assign(seat.style,{width:'16px',height:'16px'});},{passive:false});});
+  await host.locator('#start').click();await page.waitForFunction(()=>events.includes('learnedAdd'),null,{timeout:8000});
+  assert.deepEqual(await page.evaluate(()=>events),['wheel','seat','learnedAdd']);
+  console.log('PASS: absent zoom buttons use a wheel event over the tiny point, then seat and learned add target');
+  await page.evaluate(()=>{events=[];document.querySelector('#unlabelled').remove();const map=document.querySelector('#map');const replacement=map.cloneNode(true);map.replaceWith(replacement);Object.assign(replacement.querySelector('#seat').style,{width:'3px',height:'3px'});replacement.addEventListener('wheel',()=>events.push('wheel'));});
+  await host.locator('#start').click();
+  await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('Kein sichtbarer Effekt'),null,{timeout:6000});
+  await page.waitForTimeout(1000);assert.deepEqual(await page.evaluate(()=>events),['wheel']);await page.keyboard.press('Escape');
+  console.log('PASS: an unresponsive map stops additional wheel attempts without clicking a seat or cart');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
