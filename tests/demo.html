@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><title>Bereichswächter · Testseite</title>
+<style>
+body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:60px;max-width:600px}h1{font-size:34px}button{font:inherit;padding:12px 20px;border:0;border-radius:12px;background:#173d29;color:white;cursor:pointer}.seat{width:240px;height:18px;margin:24px 0;background:rgb(235,235,235);border-radius:12px}#cart{position:fixed;bottom:40px;right:40px}output{display:block;margin-top:24px}
+</style>
+<h1>Ein Platz wird verfügbar.</h1><p>Markiere mit der Erweiterung eine graue Linie und wähle den Einkaufswagen unten rechts. Starte den Testmodus und löse dann die Farbänderung aus.</p>
+<div class="seat"></div><div class="seat" id="target"></div><div class="seat"></div>
+<button id="change">Farbänderung in 2 Sekunden</button><button id="reset">Zurücksetzen</button>
+<button id="cart">🛒 Einkaufswagen</button><output id="log">Noch keine Klickfolge.</output>
+<script>
+let selected=false;
+document.querySelector('#change').onclick=()=>setTimeout(()=>document.querySelector('#target').style.background='#6c7400',2000);
+document.querySelector('#reset').onclick=()=>{selected=false;document.querySelector('#target').style.background='rgb(235,235,235)';document.querySelector('#log').textContent='Noch keine Klickfolge.'};
+document.querySelector('#target').ondblclick=()=>{selected=true;document.querySelector('#log').textContent='Doppelklick erkannt.'};
+document.querySelector('#cart').onclick=()=>document.querySelector('#log').textContent=selected?'Erfolg: Doppelklick → Einkaufswagen.':'Einkaufswagen ohne vorherigen Doppelklick.';
+</script></html>

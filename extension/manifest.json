@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "TicketMaster – Bereichswächter",
+  "version": "0.1.0",
+  "description": "Erkennt eine sichtbare Änderung im gewählten Bereich und führt eine einmalige Klickfolge aus.",
+  "permissions": ["activeTab", "scripting"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Bereichswächter öffnen" }
+}
