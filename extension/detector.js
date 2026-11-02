@@ -58,7 +58,7 @@
   function sceneChanged(before, after) {
     let changed = 0;
     for (let i = 0; i < before.length; i += 4) {
-      if (Math.max(...[0, 1, 2].map(c => Math.abs(before[i + c] - after[i + c]))) > 40) changed++;
+      if (Math.max(...[0, 1, 2].map(c => Math.abs(before[i + c] - after[i + c]))) > 24) changed++;
     }
     return changed >= Math.max(24, before.length / 4 * 0.02);
   }

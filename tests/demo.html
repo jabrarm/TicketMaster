@@ -1,7 +1,7 @@
 <!doctype html><html lang="de"><meta charset="utf-8"><title>Test · Block → Platz → Warenkorb</title>
 <style>body{font:18px system-ui;background:#f5f7f2;color:#1b3225;margin:40px;max-width:600px}#plan{position:relative;width:400px;height:280px;background:#eee;border-radius:12px}#block{position:absolute;left:50px;top:50px;width:100px;height:70px;background:#6c7400;border:0;border-radius:10px;color:white;cursor:pointer}#seat{display:none;position:absolute;left:180px;top:140px;width:18px;height:18px;background:#6c7400;border-radius:50%;cursor:pointer}#cart{position:fixed;right:35px;bottom:35px}button{font:inherit;padding:10px;margin:12px 0}output{display:block;margin-top:20px}</style>
-<h1>Block → Platz → Warenkorb</h1><p>Wähle „Plätze bereits sichtbar“, markiere die Karte als Platzsuchbereich und wähle den Warenkorb unten rechts. Mit „Blockübersicht“ lässt sich der optionale Blockmodus testen.</p>
-<div id="plan"><button id="block">Block</button><div id="seat"></div></div><button id="reset">Platzansicht</button><button id="overview">Blockübersicht</button><button id="cart" disabled>🛒 Warenkorb</button><output id="log">Warte auf Blockklick.</output>
+<h1>Block → Platz → Warenkorb</h1><p>Wähle „Plätze bereits sichtbar“, markiere die Karte als Platzsuchbereich und wähle den Warenkorb unten rechts. Mit „Blockübersicht“ lässt sich die automatische Namenssuche für S1 testen.</p>
+<div id="plan"><button id="block"><span>S1</span></button><div id="seat"></div></div><button id="reset">Platzansicht</button><button id="overview">Blockübersicht</button><button id="cart" disabled>🛒 Warenkorb</button><output id="log">Warte auf Blockklick.</output>
 <script>
 const $=id=>document.getElementById(id);
 $('block').onclick=()=>{$('block').style.display='none';$('seat').style.display='block';$('plan').style.background='#d9e4e2';$('log').textContent='Block geöffnet. Warte auf Platzauswahl.'};

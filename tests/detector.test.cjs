@@ -52,3 +52,7 @@ test('seat search requires actual scene replacement',()=>{
   assert.equal(sceneChanged(frame([235,235,235]),frame([235,235,235])),false);
   assert.equal(sceneChanged(frame([235,235,235]),frame([100,110,0])),true);
 });
+test('gray block scene transitions are recognized without reacting to minor rendering noise',()=>{
+  assert.equal(sceneChanged(frame([250,250,250]),frame([217,228,226])),true);
+  assert.equal(sceneChanged(frame([235,235,235]),frame([228,230,228])),false);
+});

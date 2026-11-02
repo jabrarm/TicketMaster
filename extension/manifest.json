@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Bereichswächter",
-  "version": "0.3.1",
-  "description": "Erkennt runde farbige Platzpunkte, klickt einen freien Platz an und betätigt den Warenkorb. Optional mit Blocköffnung.",
+  "version": "0.4.0",
+  "description": "Findet einen Block über seinen Namen (z. B. S1), öffnet ihn automatisch, wählt einen freien Platz und betätigt den Warenkorb.",
   "permissions": [
     "activeTab",
     "scripting"

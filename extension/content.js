@@ -9,7 +9,9 @@
     :host{all:initial}*{box-sizing:border-box}section{width:350px;max-height:90vh;overflow:auto;padding:20px;border-radius:16px;background:#132821;color:#f0f6f2;font:14px/1.45 system-ui;box-shadow:0 12px 40px #0005}h2{margin:0;font-size:20px}p,small{color:#c1d0c7}button{display:block;width:100%;padding:10px;margin:7px 0;border:1px solid #52715e;border-radius:8px;background:#203c2e;color:white;font:inherit;text-align:left;cursor:pointer}button:disabled{opacity:.45;cursor:default}#start{background:#c6ee9c;color:#132821;font-weight:bold}#close{float:right;width:auto;margin:0;padding:0 8px}label{display:block;margin:10px 0}input,select{font:inherit}input[type=color]{vertical-align:middle;width:45px;height:27px;border:0;padding:0}output{display:block;margin-top:12px;color:#ddedb8}.veil{position:fixed;inset:0;cursor:crosshair;background:#10251c22}.box{position:fixed;border:2px solid #67f1ac;background:#67f1ac22;pointer-events:none}.hint{position:fixed;top:10px;left:10px;padding:12px;background:#132821;color:white;pointer-events:none;font:15px system-ui}
   </style><section><button id="close">×</button><h2>Freier Platz → Warenkorb</h2>
   <p>Erkennt farbige runde Punkte statt grauer Plätze.</p>
-  <label>Ansicht <select id="mode"><option value="blocks">Blockübersicht → Block öffnen</option><option value="direct">Einzelne Plätze bereits sichtbar</option></select></label>
+  <label>Ansicht <select id="mode"><option value="name">Block nach Namen automatisch öffnen</option><option value="target">Blockziel einmalig auswählen</option><option value="blocks">Farbige Blöcke automatisch suchen</option><option value="direct">Einzelne Plätze bereits sichtbar</option></select></label>
+  <label id="blockNameLabel">Blockname <input id="blockName" value="S1" maxlength="30" style="width:100px"></label>
+  <button id="blockTarget">1 · S1 / anderen Block als Klickziel wählen</button>
   <button id="area">1 · Bereich der Blöcke markieren</button>
   <button id="seats">2 · Suchbereich für einzelne Plätze markieren</button>
   <button id="next">3 · Einkaufswagen wählen</button>
@@ -22,20 +24,24 @@
   <output role="status" aria-live="polite">Markiere nur die Platzpunkte im Saalplan und wähle den Einkaufswagen.</output>
   <small>Auch bestehende Verfügbarkeit wird geprüft. Testmodus klickt nicht. In der Gesamtübersicht das Spielfeld und farbige Symbole ausschließen. Escape stoppt jederzeit.</small></section>`;
   const $ = id => root.getElementById(id);
-  const controls = ['area','seats','next','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
+  const controls = ['area','blockTarget','blockName','seats','next','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
   const labels = {area:'1 · Bereich der Blöcke markieren',seats:'2 · Suchbereich für einzelne Plätze markieren',next:'3 · Einkaufswagen wählen'};
   const regions = {};
   const exclusions = [];
-  let cart, running = false, generation = 0, lastCapture = 0, cleanupSelection;
+  let cart, blockTarget, running = false, generation = 0, lastCapture = 0, cleanupSelection;
   const say = text => root.querySelector('output').textContent = text;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   function updateMode() {
     const blocks = $('mode').value === 'blocks';
-    $('area').hidden = !blocks; $('blockClickLabel').hidden = !blocks;
+    const target = $('mode').value === 'target';
+    const named = $('mode').value === 'name';
+    $('blockNameLabel').style.display = named ? '' : 'none';
+    $('blockTarget').style.display = target ? '' : 'none';
     $('area').style.display = blocks ? '' : 'none';
-    $('blockClickLabel').style.display = blocks ? '' : 'none';
-    $('seats').textContent = blocks ? labels.seats : '1 · Bereich mit Platzpunkten markieren';
-    $('next').textContent = blocks ? labels.next : '2 · Einkaufswagen wählen';
+    $('blockClickLabel').style.display = blocks || target || named ? '' : 'none';
+    $('exclude').style.display = blocks ? '' : 'none'; $('clearExcluded').style.display = blocks ? '' : 'none';
+    $('seats').textContent = blocks || target || named ? labels.seats : '1 · Bereich mit Platzpunkten markieren';
+    $('next').textContent = blocks || target || named ? labels.next : '2 · Einkaufswagen wählen';
   }
   $('mode').onchange = updateMode; updateMode();
   const active = token => running && generation === token && !document.hidden;
@@ -48,14 +54,14 @@
     stop(); host.style.visibility = 'hidden';
     const veil = document.createElement('div'), box = document.createElement('div'), hint = document.createElement('div');
     veil.className = 'veil'; box.className = 'box'; hint.className = 'hint';
-    hint.textContent = kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : kind === 'exclude' ? 'Spielfeld oder farbiges Symbol mit Rechteck ausschließen · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
+    hint.textContent = kind === 'blockTarget' ? 'In der Übersicht einmal auf Block S1 (oder den gewünschten Block) zeigen und klicken · wählt nur das Ziel' : kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : kind === 'exclude' ? 'Spielfeld oder farbiges Symbol mit Rechteck ausschließen · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
     root.append(veil, box, hint);
     [veil, box, hint].forEach(el => el.style.visibility = 'visible');
     cleanupSelection = () => { veil.remove(); box.remove(); hint.remove(); host.style.visibility = ''; cleanupSelection = undefined; };
     let origin;
     veil.onpointerdown = event => { event.preventDefault(); origin = {x:event.clientX,y:event.clientY}; veil.setPointerCapture(event.pointerId); };
     veil.onpointermove = event => {
-      if (!origin || kind === 'next') return;
+      if (!origin || kind === 'next' || kind === 'blockTarget') return;
       Object.assign(box.style, {left:`${Math.min(origin.x,event.clientX)}px`,top:`${Math.min(origin.y,event.clientY)}px`,width:`${Math.abs(origin.x-event.clientX)}px`,height:`${Math.abs(origin.y-event.clientY)}px`});
     };
     veil.onpointerup = event => {
@@ -63,7 +69,12 @@
       const point = {x:event.clientX,y:event.clientY};
       const rect = {x:Math.min(origin.x,point.x),y:Math.min(origin.y,point.y),width:Math.abs(origin.x-point.x),height:Math.abs(origin.y-point.y)};
       cleanupSelection();
-      if (kind === 'next') {
+      if (kind === 'blockTarget') {
+        blockTarget = {...point, element:document.elementFromPoint(point.x,point.y)};
+        $('blockTarget').textContent = '1 · Blockziel gewählt ✓';
+        say('Blockziel gespeichert. Es wird beim automatischen Start geöffnet, unabhängig von seiner Farbe.');
+        return;
+      } else if (kind === 'next') {
         const element = document.elementFromPoint(point.x,point.y);
         cart = {...point, element:element?.closest('button,a,[role="button"]') || element};
       } else {
@@ -113,6 +124,28 @@
     }
     if (twice) element.dispatchEvent(new MouseEvent('dblclick',{...options,detail:2}));
   }
+  function locateBlock(name) {
+    const normalize=text=>(text||'').normalize('NFKC').trim().replace(/\s+/g,' ').toUpperCase();
+    const wanted=normalize(name);
+    if (!wanted) throw new Error('Bitte einen Blocknamen eingeben.');
+    const matches=[];
+    for (const element of document.querySelectorAll('svg text,svg tspan,[aria-label],[data-block],[data-block-name],a,button,span,div')) {
+      if (element===host || host.contains(element)) continue;
+      const labels=[element.getAttribute('data-block'),element.getAttribute('data-block-name'),element.getAttribute('aria-label')];
+      if (element.children.length===0 || element.matches('svg text,a,button')) labels.push(element.textContent);
+      if (!labels.some(label=>normalize(label)===wanted || normalize(label)===`BLOCK ${wanted}`)) continue;
+      const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+      if (rect.width<1 || rect.height<1 || rect.width>180 || rect.height>65 || style.visibility==='hidden' || style.display==='none' || Number(style.opacity)===0) continue;
+      const point={x:rect.left+rect.width/2,y:rect.top+rect.height/2};
+      if (point.x<0 || point.y<0 || point.x>=innerWidth || point.y>=innerHeight) continue;
+      const top=document.elementFromPoint(point.x,point.y);
+      if (!top || top===host || (!element.contains(top) && !top.contains(element))) continue;
+      if (!matches.some(match=>Math.hypot(match.x-point.x,match.y-point.y)<5)) matches.push({...point,element:top});
+    }
+    if (matches.length>1) throw new Error(`Block ${name} ist nicht eindeutig. Keine Klicks ausgeführt.`);
+    if (!matches.length) throw new Error(`Block ${name} nicht automatisch gefunden. Für diese Plandarstellung ist eine Anpassung nötig; alternativ das Blockziel einmalig auswählen.`);
+    return matches[0];
+  }
   async function find(token, rect, color, seat, priorScene) {
     let previous, changed = !priorScene;
     const deadline = seat && priorScene ? Date.now()+15000 : Infinity;
@@ -133,12 +166,16 @@
     return null;
   }
   $('area').onclick=()=>select('area'); $('seats').onclick=()=>select('seats'); $('next').onclick=()=>select('next');
+  $('blockTarget').onclick=()=>select('blockTarget');
   $('exclude').onclick=()=>select('exclude');
   $('clearExcluded').onclick=()=>{exclusions.length=0;$('clearExcluded').textContent='Ausschlüsse löschen (0)';say('Ausschlüsse gelöscht.');};
   $('stop').onclick=()=>stop();
   $('start').onclick=async()=>{
     const blocks = $('mode').value === 'blocks';
+    const targeted = $('mode').value === 'target';
+    const named = $('mode').value === 'name';
     if (!regions.seats || (blocks && !regions.area)) return say('Markiere zuerst die benötigten Suchbereiche.');
+    if (targeted && !blockTarget) return say('Wähle zuerst S1 oder einen anderen Block als Klickziel.');
     const automatic=$('automatic').checked;
     if (automatic && !cart) return say('Wähle zuerst den Einkaufswagen.');
     const panel=host.getBoundingClientRect();
@@ -151,10 +188,14 @@
     try {
       say(automatic?'Aktiv · Suche Verfügbarkeit …':'Testmodus aktiv · Keine Klicks …');
       let seat;
-      if (blocks) {
-        const block=await find(token,regions.area,null,false);
+      if (blocks || targeted || named) {
+        const block=named ? locateBlock($('blockName').value) : targeted ? blockTarget : await find(token,regions.area,null,false);
         if (!block || !active(token)) return;
-        if (!automatic) return stop('Verfügbarer Block erkannt. Keine Klicks ausgeführt.');
+        if (!automatic) return stop(named ? `Block ${$('blockName').value} gefunden. Testmodus klickt nicht und bestätigt keine freien Tickets.` : targeted ? 'Blockziel gespeichert. Testmodus öffnet den Block nicht und bestätigt keine freien Tickets.' : 'Verfügbarer Block erkannt. Keine Klicks ausgeführt.');
+        if (targeted || named) {
+          const element=document.elementFromPoint(block.x,block.y);
+          if (!block.element?.isConnected || !element || !block.element.contains(element)) throw new Error('Blockziel verändert oder verdeckt. Bitte neu auswählen.');
+        }
         const before=await capture(token,regions.seats);
         if (!before || !active(token)) return;
         say('Block wird geöffnet · warte auf freie Plätze …');
@@ -184,7 +225,8 @@
   };
   function layout(event) {
     if (cleanupSelection || event?.composedPath().includes(host)) return;
-    delete regions.area; delete regions.seats; cart=undefined; exclusions.length=0;
+    delete regions.area; delete regions.seats; cart=undefined; blockTarget=undefined; exclusions.length=0;
+    $('blockTarget').textContent='1 · S1 / anderen Block als Klickziel wählen';
     $('clearExcluded').textContent='Ausschlüsse löschen (0)';
     Object.entries(labels).forEach(([id,label])=>$(id).textContent=label);
     updateMode();
