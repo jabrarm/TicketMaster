@@ -9,16 +9,26 @@ Chrome-/Edge-Erweiterung: **Runden farbigen Platzpunkt erkennen → einmal auf d
 3. Zum Aktualisieren den bisherigen Erweiterungsordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Anschließend auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
 4. Die vollständig geladene Ticketseite öffnen und das Erweiterungssymbol anklicken.
 
+## Gesamtübersicht: wichtig
+
+Die Gesamtübersicht und die Detailansicht einzelner Plätze sind unterschiedliche Zustände. Standard ist jetzt **Blockübersicht → Block öffnen**. Für sichtbare einzelne Platzpunkte den Direktmodus ausdrücklich auswählen.
+
+In der Übersicht den Blockbereich markieren und über **Spielfeld / Legende aus der Suche ausschließen** das gesamte grüne Spielfeld sowie farbige Symbole mit eigenen Rechtecken ausblenden. Mehrere Ausschlüsse sind möglich und gelten ausschließlich für die Blocksuche, nicht für die nachfolgende Platzansicht. Nach Scrollen oder Größenänderung werden sie gelöscht.
+
+Die Blocksuche benötigt einen farbigen Verfügbarkeitshinweis im markierten, nicht ausgeschlossenen Bereich. **Sind alle Blöcke grau und wird Verfügbarkeit erst nach dem Öffnen sichtbar, kann diese Version daraus keine freien Tickets ableiten und durchsucht die Blöcke nicht automatisch nacheinander.** Dafür ist eine Integration der tatsächlichen Blockelemente und der Rücknavigation erforderlich. Die Meldung „kein farbiger Verfügbarkeitshinweis“ bedeutet nicht, dass sicher keine Tickets existieren.
+
+Bereits beim Start farbig angezeigte Verfügbarkeit wird sofort berücksichtigt. Es wird nicht auf eine Farbänderung gewartet. Der Testmodus meldet Treffer und klickt ausdrücklich nichts an.
+
 ## Für die gezeigte Platzansicht
 
-1. **Plätze bereits sichtbar** als Ansicht wählen (Standard).
+1. **Plätze bereits sichtbar** als Ansicht wählen.
 2. **Bereich mit Platzpunkten markieren:** Ein Rechteck über die relevanten Sitzpunkte ziehen. Farbige Bedienelemente, Symbole und Legenden außerhalb lassen. Das Bedienfeld darf nicht im Suchbereich liegen.
 3. **Einkaufswagen wählen:** Das sichtbare Symbol unten rechts auswählen. Dieser Auswahlklick betätigt den Warenkorb noch nicht.
 4. **Platz wählen: Einfachklick** beibehalten.
 5. Zuerst ohne **Aktionen automatisch ausführen** starten. Der Testmodus meldet einen freien farbigen Punkt und klickt nichts an.
 6. Für die Klickfolge die automatische Ausführung aktivieren und erneut starten.
 
-Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter mindestens 250 ms und betätigt den gewählten Warenkorb. Ein deaktivierter Warenkorb wird bis zu drei Sekunden abgewartet. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
+Die Spielfeld-Ausschlüsse sind im Direktmodus nicht aktiv. Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter mindestens 250 ms und betätigt den gewählten Warenkorb. Ein deaktivierter Warenkorb wird bis zu drei Sekunden abgewartet. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
 
 **Escape**, Stoppen oder ein unsichtbarer Tab stoppen weitere Aktionen. Nach Scrollen oder Änderung der Fenstergröße müssen Suchbereiche und Einkaufswagen neu gewählt werden.
 
@@ -56,6 +66,6 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
+Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
 
 Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen.

@@ -6,9 +6,10 @@ const assert=require('node:assert/strict');
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),args:['--no-sandbox']});
   try{
     const page=await browser.newPage({viewport:{width:1100,height:900}});
-    await page.setContent(`<style>body{margin:0}#plan{position:absolute;left:70px;top:70px;width:350px;height:280px;background:#fafafa}#block{position:absolute;left:40px;top:40px;width:80px;height:60px;background:#6c7400}#seat{display:none;position:absolute;left:180px;top:150px;width:16px;height:16px;border-radius:50%;background:#6c7400}#cart{position:absolute;right:30px;bottom:30px}</style><div id="plan"><div id="block"></div><div id="seat"></div></div><button id="cart" disabled>Warenkorb</button>`);
+    await page.setContent(`<style>body{margin:0}#plan{position:absolute;left:70px;top:70px;width:350px;height:280px;background:#fafafa}#pitch{position:absolute;left:5px;top:5px;width:260px;height:25px;background:#366c23}#block{position:absolute;left:40px;top:40px;width:80px;height:60px;background:#6c7400}#seat{display:none;position:absolute;left:180px;top:150px;width:16px;height:16px;border-radius:50%;background:#6c7400}#cart{position:absolute;right:30px;bottom:30px}</style><div id="plan"><div id="pitch"></div><div id="block"></div><div id="seat"></div></div><button id="cart" disabled>Warenkorb</button>`);
     await page.evaluate(()=>{
       window.events=[];window.openScene=true;window.cancelAt='';
+      document.querySelector('#pitch').onclick=()=>events.push('pitch');
       const cancel=()=>document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
       document.querySelector('#block').onclick=()=>{
         events.push('block');
@@ -31,16 +32,24 @@ const assert=require('node:assert/strict');
       await host.locator('#'+id).click();await page.mouse.move(75,75);await page.mouse.down();await page.mouse.move(415,345);await page.mouse.up();
     }
     await host.locator('#next').click();await page.mouse.click(1020,855);
+    await host.locator('#exclude').click();await page.mouse.move(70,70);await page.mouse.down();await page.mouse.move(345,104);await page.mouse.up();
     const output=host.locator('output');
     await host.locator('#start').click();
-    await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('Keine Klicks'));
+    await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('Verfügbarer Block erkannt. Keine Klicks'));
     assert.deepEqual(await page.evaluate(()=>events),[]);
     console.log('PASS: already available colored block detected in test mode without clicks');
     await host.locator('#automatic').check();await host.locator('#start').click();
     await page.waitForFunction(()=>events.length===3,null,{timeout:8000});
     assert.deepEqual(await page.evaluate(()=>events),['block','seat','cart']);
     await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>events.length),3);
-    console.log('PASS: block opens, individual free seat selected, cart clicked once in order');
+    console.log('PASS: existing available block opens; excluded green pitch is never clicked; seat and cart follow once');
+    await page.evaluate(()=>{reset();document.querySelector('#block').style.background='#ebebeb';});
+    await host.locator('#start').click();
+    await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('kein farbiger Verfügbarkeitshinweis'));
+    assert.deepEqual(await page.evaluate(()=>events),[]);
+    await host.locator('#stop').click();
+    await page.evaluate(()=>document.querySelector('#block').style.background='#6c7400');
+    console.log('PASS: gray blocks and excluded green pitch produce an explicit no-availability status without clicks');
     await page.evaluate(()=>{reset();openScene=false;});await host.locator('#start').click();
     await page.waitForFunction(()=>events.length===1);
     await page.waitForTimeout(1800);assert.deepEqual(await page.evaluate(()=>events),['block']);

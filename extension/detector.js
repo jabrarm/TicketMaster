@@ -28,6 +28,7 @@
     const mask = new Uint8Array(width * height);
     for (let p = 0; p < mask.length; p++) {
       const i = p * 4;
+      if (data[i + 3] < 128) continue;
       const rgb = [data[i], data[i + 1], data[i + 2]];
       mask[p] = color ? (Math.max(...color.map((v, c) => Math.abs(v - rgb[c]))) <= 35 ? 1 : 0)
         : (Math.max(...rgb) - Math.min(...rgb) >= 25 ? 1 : 0);

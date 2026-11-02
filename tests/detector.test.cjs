@@ -42,6 +42,12 @@ test('round nongray seats are detected across colors including screenshot muted 
 test('square colored areas cannot masquerade as round seats',()=>{
   assert.equal(findAvailable(frame([108,116,0]),24,24,null,true),null);
 });
+test('explicitly excluded pitch pixels never count as block availability',()=>{
+  const pitch=frame([54,108,35]);
+  assert.ok(findAvailable(pitch,24,24,null,false));
+  for(let i=3;i<pitch.length;i+=4)pitch[i]=0;
+  assert.equal(findAvailable(pitch,24,24,null,false),null);
+});
 test('seat search requires actual scene replacement',()=>{
   assert.equal(sceneChanged(frame([235,235,235]),frame([235,235,235])),false);
   assert.equal(sceneChanged(frame([235,235,235]),frame([100,110,0])),true);

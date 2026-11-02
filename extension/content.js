@@ -9,20 +9,23 @@
     :host{all:initial}*{box-sizing:border-box}section{width:350px;max-height:90vh;overflow:auto;padding:20px;border-radius:16px;background:#132821;color:#f0f6f2;font:14px/1.45 system-ui;box-shadow:0 12px 40px #0005}h2{margin:0;font-size:20px}p,small{color:#c1d0c7}button{display:block;width:100%;padding:10px;margin:7px 0;border:1px solid #52715e;border-radius:8px;background:#203c2e;color:white;font:inherit;text-align:left;cursor:pointer}button:disabled{opacity:.45;cursor:default}#start{background:#c6ee9c;color:#132821;font-weight:bold}#close{float:right;width:auto;margin:0;padding:0 8px}label{display:block;margin:10px 0}input,select{font:inherit}input[type=color]{vertical-align:middle;width:45px;height:27px;border:0;padding:0}output{display:block;margin-top:12px;color:#ddedb8}.veil{position:fixed;inset:0;cursor:crosshair;background:#10251c22}.box{position:fixed;border:2px solid #67f1ac;background:#67f1ac22;pointer-events:none}.hint{position:fixed;top:10px;left:10px;padding:12px;background:#132821;color:white;pointer-events:none;font:15px system-ui}
   </style><section><button id="close">×</button><h2>Freier Platz → Warenkorb</h2>
   <p>Erkennt farbige runde Punkte statt grauer Plätze.</p>
-  <label>Ansicht <select id="mode"><option value="direct">Plätze bereits sichtbar</option><option value="blocks">Erst Block öffnen</option></select></label>
+  <label>Ansicht <select id="mode"><option value="blocks">Blockübersicht → Block öffnen</option><option value="direct">Einzelne Plätze bereits sichtbar</option></select></label>
   <button id="area">1 · Bereich der Blöcke markieren</button>
   <button id="seats">2 · Suchbereich für einzelne Plätze markieren</button>
   <button id="next">3 · Einkaufswagen wählen</button>
+  <button id="exclude">Spielfeld / Legende aus der Suche ausschließen</button>
+  <button id="clearExcluded">Ausschlüsse löschen (0)</button>
   <label id="blockClickLabel">Block öffnen <select id="blockClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label>Platz wählen <select id="seatClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label><input id="automatic" type="checkbox"> Aktionen automatisch ausführen</label>
   <button id="start">Überwachung starten</button><button id="stop" disabled>Stoppen</button>
   <output role="status" aria-live="polite">Markiere nur die Platzpunkte im Saalplan und wähle den Einkaufswagen.</output>
-  <small>Testmodus erkennt nur und klickt nicht. Farbige Legenden und Bedienelemente aussparen. Escape stoppt jederzeit.</small></section>`;
+  <small>Auch bestehende Verfügbarkeit wird geprüft. Testmodus klickt nicht. In der Gesamtübersicht das Spielfeld und farbige Symbole ausschließen. Escape stoppt jederzeit.</small></section>`;
   const $ = id => root.getElementById(id);
-  const controls = ['area','seats','next','mode','blockClicks','seatClicks','automatic','start'];
+  const controls = ['area','seats','next','exclude','clearExcluded','mode','blockClicks','seatClicks','automatic','start'];
   const labels = {area:'1 · Bereich der Blöcke markieren',seats:'2 · Suchbereich für einzelne Plätze markieren',next:'3 · Einkaufswagen wählen'};
   const regions = {};
+  const exclusions = [];
   let cart, running = false, generation = 0, lastCapture = 0, cleanupSelection;
   const say = text => root.querySelector('output').textContent = text;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -45,7 +48,7 @@
     stop(); host.style.visibility = 'hidden';
     const veil = document.createElement('div'), box = document.createElement('div'), hint = document.createElement('div');
     veil.className = 'veil'; box.className = 'box'; hint.className = 'hint';
-    hint.textContent = kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
+    hint.textContent = kind === 'next' ? 'Einkaufswagen anklicken · Escape: Abbrechen' : kind === 'exclude' ? 'Spielfeld oder farbiges Symbol mit Rechteck ausschließen · Escape: Abbrechen' : 'Rechteck ziehen · Escape: Abbrechen';
     root.append(veil, box, hint);
     [veil, box, hint].forEach(el => el.style.visibility = 'visible');
     cleanupSelection = () => { veil.remove(); box.remove(); hint.remove(); host.style.visibility = ''; cleanupSelection = undefined; };
@@ -65,12 +68,18 @@
         cart = {...point, element:element?.closest('button,a,[role="button"]') || element};
       } else {
         if (rect.width < 6 || rect.height < 6) return say('Bereich zu klein. Bitte erneut markieren.');
+        if (kind === 'exclude') {
+          exclusions.push(rect);
+          $('clearExcluded').textContent = `Ausschlüsse löschen (${exclusions.length})`;
+          say('Bereich ausgeschlossen. Er wird nur in der Blockübersicht ignoriert.');
+          return;
+        }
         regions[kind] = rect;
       }
       $(kind).textContent = `${labels[kind]} ✓`; say('Auswahl gespeichert.');
     };
   }
-  async function capture(token, rect) {
+  async function capture(token, rect, exclude = false) {
     await sleep(Math.max(0,550-(Date.now()-lastCapture)));
     if (!active(token)) return null;
     lastCapture = Date.now();
@@ -83,7 +92,13 @@
       canvas.width = Math.round(rect.width); canvas.height = Math.round(rect.height);
       const context = canvas.getContext('2d',{willReadFrequently:true});
       context.drawImage(bitmap,rect.x*bitmap.width/innerWidth,rect.y*bitmap.height/innerHeight,rect.width*bitmap.width/innerWidth,rect.height*bitmap.height/innerHeight,0,0,canvas.width,canvas.height);
-      return {data:context.getImageData(0,0,canvas.width,canvas.height).data,width:canvas.width,height:canvas.height};
+      const data=context.getImageData(0,0,canvas.width,canvas.height).data;
+      if (exclude) for (const excluded of exclusions) {
+        const left=Math.max(0,Math.floor(excluded.x-rect.x)),right=Math.min(canvas.width,Math.ceil(excluded.x+excluded.width-rect.x));
+        const top=Math.max(0,Math.floor(excluded.y-rect.y)),bottom=Math.min(canvas.height,Math.ceil(excluded.y+excluded.height-rect.y));
+        for(let y=top;y<bottom;y++)for(let x=left;x<right;x++)data[(y*canvas.width+x)*4+3]=0;
+      }
+      return {data,width:canvas.width,height:canvas.height};
     } finally {bitmap.close();}
   }
   function click(point, twice) {
@@ -103,7 +118,7 @@
     const deadline = seat && priorScene ? Date.now()+15000 : Infinity;
     while (active(token)) {
       if (Date.now()>deadline) throw new Error('Keine bestätigte Platzansicht mit freiem Platz erkannt. Kein Warenkorbklick.');
-      const frame = await capture(token,rect);
+      const frame = await capture(token,rect,!seat);
       if (!frame || !active(token)) return null;
       // Wait for actual content replacement after the block click. A colored
       // block in the old overview is not evidence of an individual free seat.
@@ -111,12 +126,15 @@
       if (!different) {previous=null; continue;}
       changed = changed || different;
       const point = changed && TicketDetector.findAvailable(frame.data,frame.width,frame.height,color,seat);
+      if (!point) say(seat ? 'Suche vorhandene und neue freie Platzpunkte … Noch kein passender Punkt erkannt.' : 'Blockübersicht: kein farbiger Verfügbarkeitshinweis im Suchbereich erkannt. Auch vorhandene Tickets werden geprüft.');
       if (point && previous && Math.hypot(point.x-previous.x,point.y-previous.y)<5) return {x:rect.x+point.x,y:rect.y+point.y};
       previous = point;
     }
     return null;
   }
   $('area').onclick=()=>select('area'); $('seats').onclick=()=>select('seats'); $('next').onclick=()=>select('next');
+  $('exclude').onclick=()=>select('exclude');
+  $('clearExcluded').onclick=()=>{exclusions.length=0;$('clearExcluded').textContent='Ausschlüsse löschen (0)';say('Ausschlüsse gelöscht.');};
   $('stop').onclick=()=>stop();
   $('start').onclick=async()=>{
     const blocks = $('mode').value === 'blocks';
@@ -166,7 +184,8 @@
   };
   function layout(event) {
     if (cleanupSelection || event?.composedPath().includes(host)) return;
-    delete regions.area; delete regions.seats; cart=undefined;
+    delete regions.area; delete regions.seats; cart=undefined; exclusions.length=0;
+    $('clearExcluded').textContent='Ausschlüsse löschen (0)';
     Object.entries(labels).forEach(([id,label])=>$(id).textContent=label);
     updateMode();
     stop('Ansicht verschoben. Suchbereiche und Einkaufswagen bitte neu wählen.');
