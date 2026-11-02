@@ -7,26 +7,34 @@
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = `<style>
     :host{all:initial}*{box-sizing:border-box}section{width:350px;max-height:90vh;overflow:auto;padding:20px;border-radius:16px;background:#132821;color:#f0f6f2;font:14px/1.45 system-ui;box-shadow:0 12px 40px #0005}h2{margin:0;font-size:20px}p,small{color:#c1d0c7}button{display:block;width:100%;padding:10px;margin:7px 0;border:1px solid #52715e;border-radius:8px;background:#203c2e;color:white;font:inherit;text-align:left;cursor:pointer}button:disabled{opacity:.45;cursor:default}#start{background:#c6ee9c;color:#132821;font-weight:bold}#close{float:right;width:auto;margin:0;padding:0 8px}label{display:block;margin:10px 0}input,select{font:inherit}input[type=color]{vertical-align:middle;width:45px;height:27px;border:0;padding:0}output{display:block;margin-top:12px;color:#ddedb8}.veil{position:fixed;inset:0;cursor:crosshair;background:#10251c22}.box{position:fixed;border:2px solid #67f1ac;background:#67f1ac22;pointer-events:none}.hint{position:fixed;top:10px;left:10px;padding:12px;background:#132821;color:white;pointer-events:none;font:15px system-ui}
-  </style><section><button id="close">×</button><h2>Block → Platz → Warenkorb</h2>
-  <p>Auch bereits verfügbare Plätze werden erkannt.</p>
+  </style><section><button id="close">×</button><h2>Freier Platz → Warenkorb</h2>
+  <p>Erkennt farbige runde Punkte statt grauer Plätze.</p>
+  <label>Ansicht <select id="mode"><option value="direct">Plätze bereits sichtbar</option><option value="blocks">Erst Block öffnen</option></select></label>
   <button id="area">1 · Bereich der Blöcke markieren</button>
   <button id="seats">2 · Suchbereich für einzelne Plätze markieren</button>
   <button id="next">3 · Einkaufswagen wählen</button>
-  <label>Farbe verfügbarer Block <input id="blockColor" type="color" value="#6c7400"></label>
-  <label>Farbe freier Platz <input id="seatColor" type="color" value="#6c7400"></label>
-  <label>Block öffnen <select id="blockClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
+  <label id="blockClickLabel">Block öffnen <select id="blockClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label>Platz wählen <select id="seatClicks"><option value="1">Einfachklick</option><option value="2">Doppelklick</option></select></label>
   <label><input id="automatic" type="checkbox"> Aktionen automatisch ausführen</label>
   <button id="start">Überwachung starten</button><button id="stop" disabled>Stoppen</button>
-  <output role="status" aria-live="polite">Markiere Blöcke und den erwarteten Platzbereich. Farben bitte am Saalplan prüfen.</output>
-  <small>Testmodus meldet nur verfügbare Blöcke. Escape stoppt jederzeit. Sichtbaren Tab und Ansicht beibehalten.</small></section>`;
+  <output role="status" aria-live="polite">Markiere nur die Platzpunkte im Saalplan und wähle den Einkaufswagen.</output>
+  <small>Testmodus erkennt nur und klickt nicht. Farbige Legenden und Bedienelemente aussparen. Escape stoppt jederzeit.</small></section>`;
   const $ = id => root.getElementById(id);
-  const controls = ['area','seats','next','blockColor','seatColor','blockClicks','seatClicks','automatic','start'];
+  const controls = ['area','seats','next','mode','blockClicks','seatClicks','automatic','start'];
   const labels = {area:'1 · Bereich der Blöcke markieren',seats:'2 · Suchbereich für einzelne Plätze markieren',next:'3 · Einkaufswagen wählen'};
   const regions = {};
   let cart, running = false, generation = 0, lastCapture = 0, cleanupSelection;
   const say = text => root.querySelector('output').textContent = text;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  function updateMode() {
+    const blocks = $('mode').value === 'blocks';
+    $('area').hidden = !blocks; $('blockClickLabel').hidden = !blocks;
+    $('area').style.display = blocks ? '' : 'none';
+    $('blockClickLabel').style.display = blocks ? '' : 'none';
+    $('seats').textContent = blocks ? labels.seats : '1 · Bereich mit Platzpunkten markieren';
+    $('next').textContent = blocks ? labels.next : '2 · Einkaufswagen wählen';
+  }
+  $('mode').onchange = updateMode; updateMode();
   const active = token => running && generation === token && !document.hidden;
   function stop(text = 'Gestoppt.') {
     running = false; generation++;
@@ -92,7 +100,7 @@
   }
   async function find(token, rect, color, seat, priorScene) {
     let previous, changed = !priorScene;
-    const deadline = seat ? Date.now()+15000 : Infinity;
+    const deadline = seat && priorScene ? Date.now()+15000 : Infinity;
     while (active(token)) {
       if (Date.now()>deadline) throw new Error('Keine bestätigte Platzansicht mit freiem Platz erkannt. Kein Warenkorbklick.');
       const frame = await capture(token,rect);
@@ -111,29 +119,36 @@
   $('area').onclick=()=>select('area'); $('seats').onclick=()=>select('seats'); $('next').onclick=()=>select('next');
   $('stop').onclick=()=>stop();
   $('start').onclick=async()=>{
-    if (!regions.area || !regions.seats) return say('Markiere zuerst Blockbereich und Platzsuchbereich.');
+    const blocks = $('mode').value === 'blocks';
+    if (!regions.seats || (blocks && !regions.area)) return say('Markiere zuerst die benötigten Suchbereiche.');
     const automatic=$('automatic').checked;
     if (automatic && !cart) return say('Wähle zuerst den Einkaufswagen.');
     const panel=host.getBoundingClientRect();
-    for (const rect of Object.values(regions)) {
+    for (const rect of blocks ? Object.values(regions) : [regions.seats]) {
       if (rect.x<panel.right && rect.x+rect.width>panel.left && rect.y<panel.bottom && rect.y+rect.height>panel.top) return say('Ein Suchbereich überschneidet sich mit dem Bedienfeld.');
     }
-    const blockColor=$('blockColor').value,seatColor=$('seatColor').value;
     const blockDouble=$('blockClicks').value==='2',seatDouble=$('seatClicks').value==='2';
     running=true; const token=++generation;
     controls.forEach(id=>$(id).disabled=true); $('stop').disabled=false;
     try {
-      say(automatic?'Aktiv · Suche verfügbaren Block …':'Testmodus aktiv · Suche verfügbaren Block ohne Klicks …');
-      const block=await find(token,regions.area,blockColor,false);
-      if (!block || !active(token)) return;
-      if (!automatic) return stop('Verfügbarer Block erkannt. Keine Klicks ausgeführt.');
-      const before=await capture(token,regions.seats);
-      if (!before || !active(token)) return;
-      say('Block wird geöffnet · warte auf freie Plätze …');
-      click(block,blockDouble);
-      if (!active(token)) return;
-      const seat=await find(token,regions.seats,seatColor,true,before);
+      say(automatic?'Aktiv · Suche Verfügbarkeit …':'Testmodus aktiv · Keine Klicks …');
+      let seat;
+      if (blocks) {
+        const block=await find(token,regions.area,null,false);
+        if (!block || !active(token)) return;
+        if (!automatic) return stop('Verfügbarer Block erkannt. Keine Klicks ausgeführt.');
+        const before=await capture(token,regions.seats);
+        if (!before || !active(token)) return;
+        say('Block wird geöffnet · warte auf freie Plätze …');
+        click(block,blockDouble);
+        if (!active(token)) return;
+        seat=await find(token,regions.seats,null,true,before);
+      } else {
+        // No scene replacement is needed when the individual places are visible.
+        seat=await find(token,regions.seats,null,true);
+      }
       if (!seat || !active(token)) return;
+      if (!automatic) return stop('Freier farbiger Platz erkannt. Keine Klicks ausgeführt.');
       say('Freier Platz erkannt · Platz wird ausgewählt …');
       click(seat,seatDouble);
       await sleep(250);
@@ -146,13 +161,14 @@
       const target=document.elementFromPoint(cart.x,cart.y);
       if (!cart.element?.isConnected || !target || !cart.element.contains(target)) throw new Error('Warenkorbziel verändert. Bitte neu auswählen.');
       click(cart,false);
-      if (active(token)) stop('Block geöffnet → Platz angeklickt → Warenkorb betätigt. Ergebnis bitte auf der Seite prüfen.');
+      if (active(token)) stop('Platz angeklickt → Warenkorb betätigt. Ergebnis bitte auf der Seite prüfen.');
     } catch(error) {if (active(token)) stop(`Gestoppt: ${error.message}`);}
   };
   function layout(event) {
     if (cleanupSelection || event?.composedPath().includes(host)) return;
     delete regions.area; delete regions.seats; cart=undefined;
     Object.entries(labels).forEach(([id,label])=>$(id).textContent=label);
+    updateMode();
     stop('Ansicht verschoben. Suchbereiche und Einkaufswagen bitte neu wählen.');
   }
   function visibility() {if(document.hidden) stop('Tab nicht sichtbar. Gestoppt.');}

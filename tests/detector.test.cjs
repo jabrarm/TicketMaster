@@ -21,6 +21,11 @@ test('small rendering fluctuations and isolated changed pixels are ignored', () 
   assert.equal(detectChange(baseline, changed, 24, 24), null);
 });
 const {findAvailable,sceneChanged}=require('../extension/detector.js');
+function circle(color) {
+  const result=frame([235,235,235]);
+  for(let y=0;y<24;y++)for(let x=0;x<24;x++)if(Math.hypot(x-11.5,y-11.5)<6){const i=(y*24+x)*4;result.set([...color,255],i);}
+  return result;
+}
 test('already colored availability is detected without a gray reference',()=>{
   assert.ok(findAvailable(frame([108,116,0]),24,24,'#6c7400'));
   assert.equal(findAvailable(frame([235,235,235]),24,24,'#6c7400'),null);
@@ -28,7 +33,14 @@ test('already colored availability is detected without a gray reference',()=>{
 test('seat search rejects large block shapes and accepts small seat shapes',()=>{
   const color=Uint8ClampedArray.from(Array.from({length:100*100},()=>[108,116,0,255]).flat());
   assert.equal(findAvailable(color,100,100,'#6c7400',true),null);
-  assert.ok(findAvailable(frame([108,116,0]),24,24,'#6c7400',true));
+  assert.ok(findAvailable(circle([108,116,0]),24,24,'#6c7400',true));
+});
+test('round nongray seats are detected across colors including screenshot muted olive',()=>{
+  for(const rgb of [[163,165,108],[108,116,0],[20,150,210],[210,50,30]]) assert.ok(findAvailable(circle(rgb),24,24,null,true));
+  for(const rgb of [[235,235,235],[255,255,255],[0,0,0],[120,120,120]]) assert.equal(findAvailable(circle(rgb),24,24,null,true),null);
+});
+test('square colored areas cannot masquerade as round seats',()=>{
+  assert.equal(findAvailable(frame([108,116,0]),24,24,null,true),null);
 });
 test('seat search requires actual scene replacement',()=>{
   assert.equal(sceneChanged(frame([235,235,235]),frame([235,235,235])),false);

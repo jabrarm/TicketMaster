@@ -26,6 +26,7 @@ const assert=require('node:assert/strict');
     await page.evaluate(()=>window.chrome={runtime:{sendMessage:()=>captureForTest()}});
     for(const file of ['detector.js','content.js'])await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../extension',file),'utf8')});
     const host=page.locator('#tm-watcher-host');
+    await host.locator('#mode').selectOption('blocks');
     for(const id of ['area','seats']){
       await host.locator('#'+id).click();await page.mouse.move(75,75);await page.mouse.down();await page.mouse.move(415,345);await page.mouse.up();
     }
@@ -56,5 +57,17 @@ const assert=require('node:assert/strict');
     await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
     await host.locator('#start').click();assert.match(await output.textContent(),/Markiere zuerst/);
     console.log('PASS: changed viewport invalidates configured coordinates');
+    await host.locator('#mode').selectOption('direct');
+    await page.evaluate(()=>{reset();cancelAt='';document.querySelector('#block').style.display='none';document.querySelector('#seat').style.display='block';document.querySelector('#seat').style.background='#a3a56c';});
+    await host.locator('#seats').click();await page.mouse.move(75,75);await page.mouse.down();await page.mouse.move(415,345);await page.mouse.up();
+    await host.locator('#next').click();await page.mouse.click(1020,855);
+    await host.locator('#automatic').uncheck();await host.locator('#start').click();
+    await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('Freier farbiger Platz erkannt'));
+    assert.deepEqual(await page.evaluate(()=>events),[]);
+    console.log('PASS: direct mode detects muted olive round seat without color configuration or block click');
+    await host.locator('#automatic').check();await host.locator('#start').click();
+    await page.waitForFunction(()=>events.length===2,null,{timeout:8000});
+    assert.deepEqual(await page.evaluate(()=>events),['seat','cart']);
+    console.log('PASS: direct mode performs one seat click followed by cart, without opening a block');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

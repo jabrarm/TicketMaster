@@ -1,51 +1,53 @@
-# TicketMaster · Block → Platz → Warenkorb
+# TicketMaster · Freier Platz → Warenkorb
 
-Chrome-/Edge-Erweiterung: **Verfügbaren Block erkennen → Block öffnen → einzelnen freien Platz erkennen und auswählen → Einkaufswagen betätigen.** Bereits beim Start vorhandene Verfügbarkeit wird erkannt; ein Wechsel von Grau zu Farbe ist nicht mehr erforderlich.
+Chrome-/Edge-Erweiterung: **Runden farbigen Platzpunkt erkennen → einmal auf den Platz klicken → Einkaufswagen betätigen.** Graue Punkte werden ignoriert. Bereits beim Start verfügbare Plätze werden ebenfalls erkannt.
 
-## Installation / Update
+## Installieren / aktualisieren
 
-1. Projekt über GitHub **Code → Download ZIP** herunterladen und entpacken.
-2. In `chrome://extensions` (Edge: `edge://extensions`) den Entwicklermodus einschalten und **Entpackte Erweiterung laden** → Ordner `extension` wählen.
-3. Bei einer bestehenden Installation den Ordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Danach auch die Ticketseite neu laden, damit die alte Version des Bedienfelds entfernt wird.
-4. Auf der vollständig geladenen Ticketseite das Erweiterungssymbol anklicken.
+1. Auf GitHub **Code → Download ZIP** wählen und entpacken.
+2. Unter `chrome://extensions` (Edge: `edge://extensions`) den Entwicklermodus aktivieren und den Ordner `extension` über **Entpackte Erweiterung laden** auswählen.
+3. Zum Aktualisieren den bisherigen Erweiterungsordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Anschließend auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
+4. Die vollständig geladene Ticketseite öffnen und das Erweiterungssymbol anklicken.
 
-## Einrichten
+## Für die gezeigte Platzansicht
 
-- **Bereich der Blöcke markieren:** Ein Rechteck über den relevanten Teil der Blockübersicht ziehen. Die Suche findet die konfigurierte Verfügbarkeitsfarbe, auch wenn diese schon sichtbar ist.
-- **Suchbereich für einzelne Plätze markieren:** Ein Rechteck wählen, das die Plätze nach dem Öffnen eines Blocks abdecken wird. Bei identischer Kartenposition kann es derselbe Ausschnitt wie bei den Blöcken sein. Bedienfeld und farbige Legenden aussparen. Diese Koordinaten gelten für die spätere Detailansicht, nicht für einen bereits festgelegten Platz.
-- **Einkaufswagen wählen:** Das bereits sichtbare Symbol unten rechts auswählen. Der Auswahlklick betätigt es noch nicht. Das Element muss im späteren Ablauf erhalten bleiben.
-- **Farben einstellen:** Die tatsächliche Farbe eines verfügbaren Blocks und eines freien Platzes festlegen. Beide sind vorläufig auf Olivgrün `#6c7400` eingestellt, angelehnt an das bereitgestellte Bild. Die Farbe einzelner Plätze im echten Shop ist noch nicht bestätigt. **Nicht jede Abweichung von Grau wird als freier Platz behandelt:** Weißraum, Text und andere Statusfarben sind keine verlässlichen Verfügbarkeitssignale.
-- **Klickart einstellen:** Block und Platz können unabhängig per Einfach- oder Doppelklick bedient werden; Vorgabe ist jeweils Einfachklick.
+1. **Plätze bereits sichtbar** als Ansicht wählen (Standard).
+2. **Bereich mit Platzpunkten markieren:** Ein Rechteck über die relevanten Sitzpunkte ziehen. Farbige Bedienelemente, Symbole und Legenden außerhalb lassen. Das Bedienfeld darf nicht im Suchbereich liegen.
+3. **Einkaufswagen wählen:** Das sichtbare Symbol unten rechts auswählen. Dieser Auswahlklick betätigt den Warenkorb noch nicht.
+4. **Platz wählen: Einfachklick** beibehalten.
+5. Zuerst ohne **Aktionen automatisch ausführen** starten. Der Testmodus meldet einen freien farbigen Punkt und klickt nichts an.
+6. Für die Klickfolge die automatische Ausführung aktivieren und erneut starten.
 
-Zunächst ohne **Aktionen automatisch ausführen** starten. Dieser Testmodus meldet einen verfügbaren Block und klickt nichts an. Für den gesamten Ablauf die Option anschließend aktivieren und erneut starten.
+Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter mindestens 250 ms und betätigt den gewählten Warenkorb. Ein deaktivierter Warenkorb wird bis zu drei Sekunden abgewartet. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
 
-## Ablauf
+**Escape**, Stoppen oder ein unsichtbarer Tab stoppen weitere Aktionen. Nach Scrollen oder Änderung der Fenstergröße müssen Suchbereiche und Einkaufswagen neu gewählt werden.
 
-1. Zwei aufeinanderfolgende Bilder müssen einen farblich passenden Block an derselben Position zeigen.
-2. Der Block wird angeklickt. Die anschließende Platzsuche wartet auf eine sichtbare Änderung im Platzsuchbereich gegenüber der Übersicht.
-3. In dieser veränderten Ansicht wird nach einem kleinen, farblich passenden Platz gesucht. Er muss ebenfalls in zwei Bildern bestätigt werden. Nach 15 Sekunden ohne bestätigten Platz wird abgebrochen.
-4. Genau ein erkannter Platz wird angeklickt. Nach mindestens 250 ms wird der gewählte Einkaufswagen betätigt; ist er deaktiviert, wird bis zu drei Sekunden gewartet. Hat sich das gewählte Warenkorbelement verändert, wird abgebrochen.
-5. Der Wächter stoppt. Das tatsächliche Ergebnis im Shop bitte prüfen; gesendete Ereignisse beweisen keine erfolgreiche Reservierung.
+## Optional: zuerst einen Block öffnen
 
-**Escape**, Stoppen, Tabwechsel, Scrollen oder eine Größenänderung stoppen alle weiteren Aktionen. Nach Scrollen oder Größenänderung müssen die Bereiche und der Einkaufswagen neu gewählt werden. Eine Blocköffnung, die selbst scrollt, eine neue Seite lädt oder den Warenkorb ersetzt, benötigt eine Anpassung an den echten Shop.
+Falls nur die Blockübersicht sichtbar ist, **Erst Block öffnen** auswählen und zusätzlich den Blockbereich markieren. Der Platzsuchbereich bezeichnet dann den Ausschnitt, in dem nach Öffnen des Blocks die einzelnen Plätze erscheinen werden.
 
-## Grenzen und Geschwindigkeit
+Der Wächter sucht zuerst eine farbige Fläche im Blockbereich und öffnet den Block. Danach muss sich die Platzansicht sichtbar ändern. Erst dann sucht er einen einzelnen farbigen Platzpunkt. Nach 15 Sekunden ohne bestätigte Platzansicht mit freiem Punkt wird abgebrochen; der Warenkorb wird nicht betätigt. Block und Platz sind unabhängig per Einfach- oder Doppelklick bedienbar. Der Direktmodus wartet ohne Zeitlimit auf einen freien Punkt.
 
-- Die echte Ticketseite war aus der Cloud-Entwicklungsumgebung durch die Netzwerkrichtlinie gesperrt. Die Erweiterung wurde auf einer lokalen Testseite geprüft, **nicht im echten Ticketshop**. Es wurden keine echten Tickets ausgewählt und keine echten Warenkörbe verändert.
-- Diese Version arbeitet bildbasiert. Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde; mindestens 550 ms liegen zwischen Aufnahmen. Je Erkennungsstufe werden zwei Bilder benötigt. Hinzu kommen eine Aufnahme vor dem Blockklick, Bildverarbeitung, Ladezeit der Detailansicht und die Wartezeit vor dem Warenkorb. Es gibt keine garantierte Latenz.
-- Die Suche verwendet die eingestellte Farbe mit einer Toleranz von 35 pro RGB-Kanal. Eine zusammenhängende Fläche muss mindestens zwölf passende Pixel enthalten. Ein Platz darf höchstens 48×48 CSS-Pixel groß sein und kein Seitenverhältnis über 2,5 haben. Die Auswahl bevorzugt passende Flächen oben, dann links. Preis, Sicht, zusammenhängende Sitze und Kategorien werden nicht ausgewertet.
-- Der Ansichtswechsel erfordert mindestens 24 deutlich veränderte Pixel und mindestens 2 % Veränderung im gewählten Platzsuchbereich. Das ist eine bildbasierte Plausibilitätsprüfung, kein Nachweis eines bestimmten Shopzustands. Animationen oder farbige Legenden können Fehlinterpretationen verursachen. Kleine, passende Bereiche konfigurieren.
-- Der Tab muss sichtbar bleiben. Die Erweiterung lädt die Seite nicht selbst neu und kann Verfügbarkeit nur erkennen, wenn der Shop sie im Browser anzeigt.
-- Synthetische Mausereignisse werden nicht von jedem Shop akzeptiert. Eingebettete Frames, Navigation zu einer neuen Seite, erst später erscheinende Einkaufswagen oder eine Bestätigung der tatsächlichen Platzauswahl benötigen weitere Integration.
+## Grenzen
+
+- Die echte Ticketseite war aus der Cloud-Entwicklungsumgebung durch die Netzwerkrichtlinie gesperrt. Die Erkennung und Klickfolge wurden auf einer lokalen Testseite geprüft, **nicht im echten Ticketshop**. Der Screenshot dient als Hinweis für die Darstellung; er beweist keine erfolgreiche Integration. Es wurden keine echten Tickets oder Warenkörbe verändert.
+- Farbig bedeutet eine Differenz von mindestens 25 zwischen dem höchsten und niedrigsten RGB-Kanal. Weiß, Schwarz und Grau zählen nicht als farbig. Ein Platz benötigt mindestens zwölf zusammenhängende passende Pixel, maximal 48×48 CSS-Pixel, ein Seitenverhältnis von höchstens 1,5 und eine Flächendichte zwischen 0,5 und 0,94. Das ist eine Formheuristik, keine semantische Prüfung der Verfügbarkeit. Farbige runde Symbole oder andersfarbige belegte Plätze im Suchbereich können ebenfalls erkannt werden.
+- Die Auswahl bevorzugt Punkte oben, dann links. Preis, Sicht, Kategorie und zusammenhängende Plätze werden nicht berücksichtigt. Die Suchfläche entsprechend begrenzen.
+- Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde. Aufnahmen erfolgen mindestens 550 ms auseinander. Zwei Bilder bestätigen eine Erkennung: ungefähr 0,6–1,2 Sekunden plus Aufnahme-/Verarbeitungszeit im Direktmodus, danach die Wartezeit vor dem Warenkorb. Der Blockmodus benötigt zusätzliche Aufnahmen und Ladezeit. Keine garantierte Latenz.
+- Der Tab muss sichtbar bleiben. Die Seite wird nicht selbst neu geladen. Der Wächter sieht nur die vom Shop im Browser angezeigte Verfügbarkeit.
+- Synthetische Mausereignisse werden nicht von jedem Shop akzeptiert. Ein Klick ist kein Nachweis einer erfolgreichen Platzauswahl oder Reservierung. Das tatsächliche Ergebnis bitte im Shop prüfen.
+- Der ausgewählte Warenkorb muss sichtbar bleiben und als Seitenelement erhalten sein. Erscheint er erst nach der Platzauswahl oder wird er ersetzt, benötigt das eine Integration für die konkrete Seite. Ein verändertes Ziel wird nicht blind angeklickt.
+- Ein Blockwechsel mit Navigation zu einer neuen Seite, Scrollen oder Größenänderung beendet den Ablauf. Eingebettete Frames benötigen zusätzliche Integration.
+- Im Blockmodus erfordert der Ansichtswechsel mindestens 24 deutlich veränderte Pixel und mindestens 2 % Veränderung im Platzsuchbereich. Animationen sind kein verlässlicher Nachweis eines bestimmten Shopzustands.
 - Checkout und Zahlung werden nicht automatisiert.
 
 ## Datenschutz
 
-Nur `activeTab` und `scripting`; Zugriff erfolgt nach Klick auf das Erweiterungssymbol. Aufnahmen werden lokal im Arbeitsspeicher verarbeitet und weder gespeichert noch übertragen. Es werden keine Zugangsdaten benötigt.
+Nur `activeTab` und `scripting`; Zugriff erfolgt nach Klick auf das Erweiterungssymbol. Aufnahmen werden lokal im Arbeitsspeicher verarbeitet und weder gespeichert noch an einen Server übertragen. Es werden keine Zugangsdaten benötigt.
 
 ## Entwickeln und testen
 
-Die Erweiterung benötigt keinen Build. Für die Entwicklung Node.js ab Version 20:
+Die Erweiterung selbst benötigt weder Build noch npm-Pakete. Für Tests Node.js ab Version 20:
 
 ```sh
 npm ci
@@ -54,6 +56,6 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Er prüft bereits vorhandene Verfügbarkeit, Testmodus, Reihenfolge Block → Platz → Warenkorb, einmalige Ausführung, fehlenden Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt. Die Tab-Prüfungen des Hintergrunddiensts werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zusätzlich zu prüfen.
+Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
 
-Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen. Dort Blockbereich und Platzsuchbereich über der Karte markieren.
+Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen.

@@ -23,12 +23,14 @@
       ? { x: best.x / best.count, y: best.y / best.count, count: best.count } : null;
   }
   function findAvailable(data, width, height, hex, seat = false) {
-    if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('Ungültige Verfügbarkeitsfarbe.');
-    const color = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    if (hex && !/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('Ungültige Verfügbarkeitsfarbe.');
+    const color = hex ? [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)) : null;
     const mask = new Uint8Array(width * height);
     for (let p = 0; p < mask.length; p++) {
       const i = p * 4;
-      mask[p] = Math.max(...color.map((v, c) => Math.abs(v - data[i + c]))) <= 35 ? 1 : 0;
+      const rgb = [data[i], data[i + 1], data[i + 2]];
+      mask[p] = color ? (Math.max(...color.map((v, c) => Math.abs(v - rgb[c]))) <= 35 ? 1 : 0)
+        : (Math.max(...rgb) - Math.min(...rgb) >= 25 ? 1 : 0);
     }
     const candidates = [];
     for (let p = 0; p < mask.length; p++) {
@@ -43,7 +45,8 @@
         }
       }
       const w = maxX - minX + 1, h = maxY - minY + 1;
-      if (queue.length < 12 || (seat && (w > 48 || h > 48 || w / h > 2.5 || h / w > 2.5))) continue;
+      const density = queue.length / (w * h);
+      if (queue.length < 12 || (seat && (w > 48 || h > 48 || w / h > 1.5 || h / w > 1.5 || density < 0.5 || density > 0.94))) continue;
       // Choose a matching pixel nearest the centroid (also safe for hollow shapes).
       const cx = sx / queue.length, cy = sy / queue.length;
       const nearest = queue.reduce((a, b) => Math.hypot(a % width - cx, Math.floor(a / width) - cy) <= Math.hypot(b % width - cx, Math.floor(b / width) - cy) ? a : b);
