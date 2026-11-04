@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Bereichswächter",
-  "version": "0.7.0",
-  "description": "Drei Mausradschritte aus der Gesamtansicht, verfügbaren Block aus der Miniaturübersicht öffnen, freien Platz wählen und cart add betätigen.",
+  "version": "0.7.1",
+  "description": "Zwei Mausradschritte, farbigen Block mit sichtbarer Zielprüfung öffnen, freien Platz wählen und cart add betätigen.",
   "permissions": [
     "activeTab",
     "scripting",

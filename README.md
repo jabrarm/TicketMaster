@@ -1,15 +1,30 @@
-# TicketMaster · 3 × Zoom → Block → Platz → cart add
+# TicketMaster · 2 × Zoom → Block → Platz → cart add
 
-Version 0.7 ersetzt die vorherigen Suchmodi durch einen festen Ablauf:
+Version 0.7.1 ersetzt die vorherigen Suchmodi durch einen festen Ablauf:
 
 1. In der am weitesten entfernten Stadionansicht beginnen.
-2. Genau **drei getrennte Mausradereignisse zum Hineinzoomen** senden.
+2. Genau **zwei getrennte Mausradereignisse zum Hineinzoomen** senden.
 3. Einen bereits vorhandenen oder neu farbig markierten verfügbaren Block in der kleinen Übersicht oben rechts erkennen und **einmal anklicken**.
 4. Erst nach einer erkannten Veränderung der großen Platzansicht einen freien farbigen runden Punkt suchen und **einmal anklicken**.
 5. Die daraufhin erscheinende aktive Hinzufügen-Schaltfläche über Tooltip **cart add**, Beschriftung, Symbolmerkmal oder ein einmalig eingelerntes Ziel finden und **einmal anklicken**.
 6. Stoppen und das tatsächliche Ergebnis im Shop prüfen.
 
 **Kein Blockname und keine feste Warenkorbposition werden eingegeben.** Das Bedienfeld sitzt unten links, damit es die Übersicht oben rechts nicht verdeckt. Das Verfahren ist auf lokalen Testseiten mit SVG- und Canvas-Miniaturkarten geprüft. Der echte Shop ist weiterhin nicht verifiziert: Seine Domain wird in der Cloud-Ausführungsumgebung mit HTTP 403 vom Netzwerkproxy blockiert. Ein erfolgreicher lokaler Test beweist keine erfolgreiche Reservierung im echten Shop.
+
+## Korrektur der Blockauswahl in 0.7.1
+
+- Genau **zwei** anfängliche Zoomereignisse.
+- Bekannte graue Blockelemente verhindern nicht mehr die Bildsuche nach anderen, unbekannten farbigen Blöcken. Ausdrücklich nicht verfügbare Bereiche werden gezielt aus der Bildsuche ausgespart.
+- Bei gebogenen/hohlen SVG-Blöcken wird ein tatsächlich zur Form gehörender Punkt gesucht. Der Mittelpunkt des Begrenzungsrechtecks ist nicht mehr die einzige Option. Beschriftungen über der Form, moderne CSS-Farben, farbige Konturen und SVG-use-Instanzen werden berücksichtigt.
+- Vor dem Klick werden Mausbewegungsereignisse zum Ziel gesendet und ein Browser-Frame abgewartet, damit Canvas-Karten ihren aktiven Block aktualisieren können. Anschließend wird das Ziel erneut geprüft. Dies bleiben synthetische Ereignisse; der echte Shop kann sie weiterhin ablehnen.
+
+### Sichtbar prüfen, warum kein Block angeklickt wird
+
+In der bereits gezoomten Ansicht den Wächter stoppen und **Aktuelle Übersicht prüfen · ohne Zoom/Klicks** wählen. Diese Prüfung zoomt nicht erneut und wählt weder Block noch Platz aus. Sie verwendet die bereits markierte oder automatisch gefundene Miniaturübersicht. Falls die Übersicht nicht erkannt wird, zuerst ihren Bereich markieren.
+
+Das grüne Zielzeichen zeigt den geplanten Klickpunkt direkt auf der Karte. Im Vorschaubild zeigt ein grünes Kreuz denselben Punkt; rote Rechtecke markieren ausdrücklich nicht verfügbare Bereiche. Über **Diagnosebild speichern** lässt sich genau dieser Ausschnitt als PNG herunterladen. Das Bild hilft zu unterscheiden, ob der Ausschnitt falsch gewählt ist, eine Markierung nicht erkannt wird oder ein Klick vom Shop nicht angenommen wird. Bei SVG-Erkennung kann die Vorschau erst nach dieser separaten Prüfung vorliegen.
+
+Wenn die Erkennung auf der echten Seite weiterhin fehlschlägt, dieses Diagnosebild zusammen mit der angezeigten Statusmeldung bereitstellen. Bisherige Tests stammen aus lokalen, reproduzierbaren Fällen; eine erfolgreiche Auswahl auf der echten Seite ist damit noch nicht bewiesen.
 
 ## Installieren / aktualisieren
 
@@ -20,10 +35,10 @@ Version 0.7 ersetzt die vorherigen Suchmodi durch einen festen Ablauf:
 ## Einrichten und starten
 
 1. Die echte Ticketseite vollständig laden lassen, vorhandene Platzauswahl zurücksetzen und die Karte **manuell ganz herauszoomen**. Der Wächter kann den Ausgangszoom nicht zuverlässig selbst bestimmen oder zurücksetzen. Bei bereits aktiver cart-add-Schaltfläche wird kein neuer automatischer Durchlauf gestartet.
-2. Erweiterungssymbol anklicken und **Großen Kartenbereich markieren** wählen. Ein Rechteck über den großen Saalplan ziehen, ohne Kopfzeile, Mengen- und Preissteuerungen. Der Mittelpunkt dieses Rechtecks ist der Ursprung der drei Mausradereignisse. Die Miniaturübersicht wird bei der späteren Sitzsuche automatisch ausgespart.
-3. **Ablauf starten**. Es werden genau drei Zoomereignisse gesendet und anschließend wird eine sichtbare Kartenänderung verlangt. Es gibt keine weiteren automatischen Zoomschritte.
+2. Erweiterungssymbol anklicken und **Großen Kartenbereich markieren** wählen. Ein Rechteck über den großen Saalplan ziehen, ohne Kopfzeile, Mengen- und Preissteuerungen. Der Mittelpunkt dieses Rechtecks ist der Ursprung der zwei Mausradereignisse. Die Miniaturübersicht wird bei der späteren Sitzsuche automatisch ausgespart.
+3. **Ablauf starten**. Es werden genau zwei Zoomereignisse gesendet und anschließend wird eine sichtbare Kartenänderung verlangt. Es gibt keine weiteren automatischen Zoomschritte.
 4. Die Miniaturübersicht wird nach Möglichkeit anhand ihrer Seitenstruktur erkannt. Falls das nicht gelingt, wartet der Ablauf nach dem dritten Zoom: **Übersicht oben rechts markieren** wählen und nur das kleine Miniatur-Stadion eng mit einem Rechteck umrahmen, ohne Schließen-Knopf und sonstige Symbole. Danach geht es automatisch weiter, ohne erneut zu zoomen. Der Ausschnitt darf auch schon vor dem Start konfiguriert werden, wenn seine spätere Position bekannt ist.
-5. **Ohne Häkchen** bei „Block, Platz und cart add automatisch anklicken“ ist dies ein Testlauf: Er zoomt dreimal und bestätigt einen verfügbaren Block, führt aber keine Auswahlklicks aus.
+5. **Ohne Häkchen** bei „Block, Platz und cart add automatisch anklicken“ ist dies ein Testlauf: Er zoomt zweimal und bestätigt einen verfügbaren Block, führt aber keine Auswahlklicks aus.
 6. Für den vollständigen Ablauf vor dem nächsten Start wieder ganz herauszoomen, gegebenenfalls die Bereiche neu markieren und das Häkchen aktivieren. Die Startansicht darf nicht vom vorherigen Test bereits vergrößert sein.
 
 Der Wächter wartet auch auf später erscheinende Verfügbarkeit, ohne die Seite neu zu laden und ohne erneut zu zoomen. Er berücksichtigt bereits vorhandene Tickets sofort. Pro Durchlauf wird höchstens ein Block, ein Platz und eine Hinzufügen-Aktion angeklickt.
@@ -39,9 +54,9 @@ Der Wächter wartet auch auf später erscheinende Verfügbarkeit, ohne die Seite
 
 ## Wie der farbige Block erkannt wird
 
-Vorrangig werden zugängliche Blockelemente in der Miniaturübersicht anhand von Verfügbarkeitsattributen, eindeutigem Status oder farbiger Blockfüllung ausgewertet. Unterstützt werden Blockattribute, Blockklassen und übliche SVG-Blockkennungen; graue Füllungen zählen nicht, eine ausdrückliche Nichtverfügbarkeit hat Vorrang vor der Farbe. Die Blocknamen werden intern als Kennungen verwendet, aber nicht vom Benutzer eingegeben.
+Vorrangig werden zugängliche Blockelemente in der Miniaturübersicht anhand von Verfügbarkeitsattributen, eindeutigem Status oder farbiger Blockfüllung oder -kontur ausgewertet. Unterstützt werden Blockattribute, Blockklassen und übliche SVG-Blockkennungen; graue Füllungen zählen nicht, eine ausdrückliche Nichtverfügbarkeit hat Vorrang vor der Farbe. Die Blocknamen werden intern als Kennungen verwendet, aber nicht vom Benutzer eingegeben.
 
-Bei einer als Bild/Canvas dargestellten oder unbekannten Übersicht wird der markierte Ausschnitt bildbasiert untersucht. Kleine zusammenhängende farbige Flächen im äußeren Stadionring dienen als mögliche Blockmarkierungen. Große zentrale Flächen und dünne Umrissrahmen sollen dadurch ausgeschlossen werden. **Das ist eine Heuristik für die angenommene Stadionansicht, keine semantische Garantie:** Eine anders gestaltete Miniaturkarte, ein zu weit gefasster Ausschnitt, farbige Legenden, ausgewählte statt verfügbare Blöcke oder sehr kleine Markierungen können zu Fehlinterpretationen oder fehlenden Treffern führen. Deshalb zuerst einen Testlauf durchführen und die tatsächlich erkannte Markierung prüfen.
+Wenn die Seitenstruktur keinen verfügbaren Kandidaten liefert, wird der markierte Ausschnitt zusätzlich bildbasiert untersucht. Ausdrückliche Nichtverfügbarkeit wird dabei ausgespart; sie darf nicht durch den Bildabgleich übergangen werden. Kleine zusammenhängende farbige Flächen im äußeren Stadionring dienen als mögliche Blockmarkierungen. Große zentrale Flächen und dünne Umrissrahmen sollen dadurch ausgeschlossen werden. **Das ist eine Heuristik für die angenommene Stadionansicht, keine semantische Garantie:** Eine anders gestaltete Miniaturkarte, ein zu weit gefasster Ausschnitt, farbige Legenden, ausgewählte statt verfügbare Blöcke oder sehr kleine Markierungen können zu Fehlinterpretationen oder fehlenden Treffern führen. Deshalb zuerst einen Testlauf durchführen und die tatsächlich erkannte Markierung prüfen.
 
 Der erste bestätigte farbige Kandidat wird verwendet. Eine Priorisierung nach Preis, Kategorie, Tribüne oder zusammenhängenden Sitzplätzen ist nicht implementiert. In der großen Karte gilt die beschriebene Annahme: farbige runde Punkte sind freie Plätze, graue Punkte nicht. Sollte der Shop farbige Punkte auch für andere Status verwenden, muss die Erkennung angepasst werden.
 
@@ -55,7 +70,7 @@ Ein gelernter Selektor hat Vorrang. Bei fehlenden oder mehrdeutigen Merkmalen wi
 
 ## Technische Grenzen
 
-- „Drei Mausradschritte“ bedeutet hier drei synthetische WheelEvents mit jeweils `deltaY=-100`, Pixelmodus und etwa 180 ms Abstand. Das sind keine vertrauenswürdigen Hardwareereignisse. Der tatsächliche Zoomfaktor ist von der Kartenbibliothek abhängig und entspricht nicht garantiert drei physischen Rastungen des eigenen Mausrads. Akzeptiert die Karte diese Ereignisse nicht, wird ohne Auswahlklick gestoppt. Das ist im echten Shop noch zu prüfen.
+- „Zwei Mausradschritte“ bedeutet hier zwei synthetische WheelEvents mit jeweils `deltaY=-100`, Pixelmodus und etwa 180 ms Abstand. Das sind keine vertrauenswürdigen Hardwareereignisse. Der tatsächliche Zoomfaktor ist von der Kartenbibliothek abhängig und entspricht nicht garantiert zwei physischen Rastungen des eigenen Mausrads. Akzeptiert die Karte diese Ereignisse nicht, wird ohne Auswahlklick gestoppt. Das ist im echten Shop noch zu prüfen.
 - Die Startansicht muss vom Benutzer vorbereitet werden. Die Anwendung prüft die sichtbare Änderung, aber nicht, ob ein bestimmter numerischer Zoomfaktor erreicht wurde.
 - Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde; mindestens 550 ms liegen zwischen Aufnahmen. DOM-basierte Blockerkennung kann schneller reagieren, bildbasierte Bestätigung und die Sitzsuche benötigen mehrere Aufnahmen. Es gibt keine garantierte Gesamtlatenz.
 - Die Karten- und Blocköffnung werden anhand sichtbarer Bildänderungen geprüft. Diese sind ein Plausibilitätssignal, kein Nachweis des internen Shopzustands. Animationen können stören.
@@ -64,7 +79,7 @@ Ein gelernter Selektor hat Vorrang. Bei fehlenden oder mehrdeutigen Merkmalen wi
 
 ## Datenschutz
 
-`activeTab` und `scripting` erlauben Zugriff nach Klick auf das Erweiterungssymbol. `storage` speichert nur ein ausdrücklich eingelerntes Warenkorbziel lokal, nach Origin und Pfad der Shopseite, ohne URL-Parameter. Bildschirmaufnahmen bleiben im Arbeitsspeicher und werden weder gespeichert noch an einen Server gesendet. Keine Zugangsdaten erforderlich.
+`activeTab` und `scripting` erlauben Zugriff nach Klick auf das Erweiterungssymbol. `storage` speichert nur ein ausdrücklich eingelerntes Warenkorbziel lokal, nach Origin und Pfad der Shopseite, ohne URL-Parameter. Bildschirmaufnahmen bleiben standardmäßig im Arbeitsspeicher und werden nicht an einen Server gesendet. Nur über den ausdrücklichen Klick auf „Diagnosebild speichern“ wird der angezeigte Miniatur-Ausschnitt als lokale PNG-Datei heruntergeladen. Keine Zugangsdaten erforderlich.
 
 ## Entwicklung und Prüfung
 
@@ -77,6 +92,8 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Die Browsertests verwenden `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Sie prüfen den gesamten neuen Ablauf mit genau drei Zoomereignissen, SVG-/Canvas-Blockmarkierungen, bestehender und später erscheinender Verfügbarkeit, Kalibrierung nach dem Zoom, Vorrang des Blockklicks, Maskierung der Miniaturkarte, fehlender Blocköffnung, cart-add-Tooltip, Abbruch zwischen den Schritten und nicht reagierendem Mausrad. Die Chrome-Aufnahme-API wird im Test durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat simuliert. Die eigentliche Shopintegration und vollständige Erweiterungsausführung sind damit noch nicht bestätigt.
+Zusätzliche Regressionstests prüfen konkave SVG-Formen, überlagerte Beschriftungen, moderne CSS-Farben, farbige Konturen, use-Instanzen, gemischte bekannte/unbekannte Blockelemente, Canvas-Klicks mit erforderlicher vorheriger Mausbewegung sowie Diagnosebild-Export ohne Zoom/Klicks.
 
-Für einen manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen. Die Demo startet ganz herausgezoomt und zeigt ihre Miniaturübersicht nach drei Mausradereignissen.
+Die Browsertests verwenden `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Sie prüfen den gesamten neuen Ablauf mit genau zwei Zoomereignissen, SVG-/Canvas-Blockmarkierungen, bestehender und später erscheinender Verfügbarkeit, Kalibrierung nach dem Zoom, Vorrang des Blockklicks, Maskierung der Miniaturkarte, fehlender Blocköffnung, cart-add-Tooltip, Abbruch zwischen den Schritten und nicht reagierendem Mausrad. Die Chrome-Aufnahme-API wird im Test durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat simuliert. Die eigentliche Shopintegration und vollständige Erweiterungsausführung sind damit noch nicht bestätigt.
+
+Für einen manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen. Die Demo startet ganz herausgezoomt und zeigt ihre Miniaturübersicht nach zwei Mausradereignissen.
