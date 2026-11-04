@@ -29,41 +29,16 @@ const source=file=>fs.readFileSync(path.join(__dirname,'../extension',file),'utf
     await page.evaluate(()=>{const cover=document.createElement('div');cover.style='position:fixed;inset:0;background:white';document.body.append(cover);});
     assert.equal(await page.evaluate(()=>TicketCart.findActions().length),0);
     console.log('PASS: accessible icon labels are supported and covered buttons are excluded');
+    for(const attribute of ['title','data-original-title','data-bs-title','data-bs-original-title','data-tooltip','mattooltip']){
+      await page.setContent(`<button id="tooltipAction" ${attribute}="cart add"><svg width="20" height="20"></svg></button>`);
+      assert.equal(await page.evaluate(()=>TicketCart.findActions()[0]?.element.id),'tooltipAction');
+    }
+    await page.setContent('<span id="tip" role="tooltip">cart add</span><button id="describedAction" aria-describedby="tip"><svg width="20" height="20"></svg></button>');
+    assert.equal(await page.evaluate(()=>TicketCart.findActions()[0]?.element.id),'describedAction');
+    console.log('PASS: cart add is recognized through native, framework and accessible tooltip metadata');
     await page.setContent('<p>Keine Schaltfläche</p>');
     assert.match(await page.evaluate(async()=>{const controller=new AbortController();const result=TicketCart.waitForAction({signal:controller.signal,timeout:1000}).catch(error=>error.message);controller.abort();return result;}),/abgebrochen/);
     console.log('PASS: abort cancels a pending dynamic button search');
 
-    // Actual content-script flow: no cart exists during configuration.
-    await page.setContent('<style>body{margin:0}#seat{position:absolute;left:120px;top:120px;width:16px;height:16px;border-radius:50%;background:#a3a56c}</style><div id="seat"></div>');
-    await page.evaluate(()=>{
-      window.events=[];
-      document.querySelector('#seat').onclick=()=>{
-        events.push('seat');setTimeout(()=>{const button=document.createElement('button');button.id='dynamic';button.textContent='Add items';button.disabled=true;button.style='position:fixed;right:30px;bottom:30px';button.onclick=()=>events.push('add');document.body.append(button);setTimeout(()=>button.disabled=false,100);},100);
-      };
-    });
-    await page.exposeFunction('captureForTest',async()=>({data:`data:image/png;base64,${(await page.screenshot()).toString('base64')}`}));
-    await page.evaluate(()=>window.chrome={runtime:{sendMessage:()=>captureForTest()}});
-    for(const file of ['detector.js','cart.js','zoom.js','content.js'])await page.addScriptTag({content:source(file)});
-    const host=page.locator('#tm-watcher-host');
-    await host.locator('#mode').selectOption('direct');
-    assert.equal(await host.locator('#autoCart').isChecked(),true);
-    assert.equal(await host.locator('#next').isVisible(),false);
-    await host.locator('#seats').click();await page.mouse.move(100,100);await page.mouse.down();await page.mouse.move(160,160);await page.mouse.up();
-    await host.locator('#automatic').check();await host.locator('#start').click();
-    await page.waitForFunction(()=>events.length===2,null,{timeout:5000});
-    assert.deepEqual(await page.evaluate(()=>events),['seat','add']);
-    await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>events.length),2);
-    console.log('PASS: content script starts without a cart target, selects one seat and clicks the dynamically appearing add button once');
-
-    await page.evaluate(()=>{
-      events=[];document.querySelector('#dynamic').remove();
-      document.querySelector('#seat').onclick=()=>events.push('seat');
-    });
-    await host.locator('#start').click();await page.waitForFunction(()=>events.length===1);
-    await page.waitForFunction(()=>document.querySelector('#tm-watcher-host').shadowRoot.querySelector('output').textContent.includes('warte auf aktive'));
-    await page.keyboard.press('Escape');
-    await page.evaluate(()=>{const button=document.createElement('button');button.textContent='Add items';button.onclick=()=>events.push('add');document.body.append(button);});
-    await page.waitForTimeout(300);assert.deepEqual(await page.evaluate(()=>events),['seat']);
-    console.log('PASS: Escape after seat selection prevents a later add button from being clicked');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

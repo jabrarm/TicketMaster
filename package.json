@@ -1,6 +1,6 @@
 {
   "name": "ticketmaster-bereichswaechter",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "test": "node tests/detector.test.cjs && node tests/background.test.cjs && node tests/cart.test.cjs",

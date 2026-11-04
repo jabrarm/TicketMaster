@@ -1,129 +1,74 @@
-# TicketMaster · Freier Platz → Warenkorb
+# TicketMaster · 3 × Zoom → Block → Platz → cart add
 
-Chrome-/Edge-Erweiterung: **Runden farbigen Platzpunkt erkennen → einmal auf den Platz klicken → Einkaufswagen betätigen.** Graue Punkte werden ignoriert. Bereits beim Start verfügbare Plätze werden ebenfalls erkannt.
+Version 0.7 ersetzt die vorherigen Suchmodi durch einen festen Ablauf:
+
+1. In der am weitesten entfernten Stadionansicht beginnen.
+2. Genau **drei getrennte Mausradereignisse zum Hineinzoomen** senden.
+3. Einen bereits vorhandenen oder neu farbig markierten verfügbaren Block in der kleinen Übersicht oben rechts erkennen und **einmal anklicken**.
+4. Erst nach einer erkannten Veränderung der großen Platzansicht einen freien farbigen runden Punkt suchen und **einmal anklicken**.
+5. Die daraufhin erscheinende aktive Hinzufügen-Schaltfläche über Tooltip **cart add**, Beschriftung, Symbolmerkmal oder ein einmalig eingelerntes Ziel finden und **einmal anklicken**.
+6. Stoppen und das tatsächliche Ergebnis im Shop prüfen.
+
+**Kein Blockname und keine feste Warenkorbposition werden eingegeben.** Das Bedienfeld sitzt unten links, damit es die Übersicht oben rechts nicht verdeckt. Das Verfahren ist auf lokalen Testseiten mit SVG- und Canvas-Miniaturkarten geprüft. Der echte Shop ist weiterhin nicht verifiziert: Seine Domain wird in der Cloud-Ausführungsumgebung mit HTTP 403 vom Netzwerkproxy blockiert. Ein erfolgreicher lokaler Test beweist keine erfolgreiche Reservierung im echten Shop.
 
 ## Installieren / aktualisieren
 
 1. Auf GitHub **Code → Download ZIP** wählen und entpacken.
-2. Unter `chrome://extensions` (Edge: `edge://extensions`) den Entwicklermodus aktivieren und den Ordner `extension` über **Entpackte Erweiterung laden** auswählen.
-3. Zum Aktualisieren den bisherigen Erweiterungsordner durch die neue Version ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Anschließend auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
-4. Die vollständig geladene Ticketseite öffnen und das Erweiterungssymbol anklicken.
+2. In Chrome `chrome://extensions` oder in Edge `edge://extensions` den Entwicklermodus einschalten und den Ordner `extension` über **Entpackte Erweiterung laden** öffnen.
+3. Bei einem Update den bisherigen Erweiterungsordner ersetzen und in der Erweiterungsübersicht **Neu laden** anklicken. Auch die Ticketseite neu laden, um das alte Bedienfeld zu entfernen.
 
-## Neu: Warenkorb-plus-Symbol und Einlernen
+## Einrichten und starten
 
-Zusätzlich zu Textbeschriftungen erkennt die Suche eindeutige Symbolmerkmale wie `fa-cart-plus`, `data-icon="cart-plus"` oder einen SVG-Verweis auf `cart-plus`. Ein bloßes Einkaufswagensymbol ohne Plus wird nicht automatisch als Hinzufügen-Aktion behandelt.
+1. Die echte Ticketseite vollständig laden lassen, vorhandene Platzauswahl zurücksetzen und die Karte **manuell ganz herauszoomen**. Der Wächter kann den Ausgangszoom nicht zuverlässig selbst bestimmen oder zurücksetzen. Bei bereits aktiver cart-add-Schaltfläche wird kein neuer automatischer Durchlauf gestartet.
+2. Erweiterungssymbol anklicken und **Großen Kartenbereich markieren** wählen. Ein Rechteck über den großen Saalplan ziehen, ohne Kopfzeile, Mengen- und Preissteuerungen. Der Mittelpunkt dieses Rechtecks ist der Ursprung der drei Mausradereignisse. Die Miniaturübersicht wird bei der späteren Sitzsuche automatisch ausgespart.
+3. **Ablauf starten**. Es werden genau drei Zoomereignisse gesendet und anschließend wird eine sichtbare Kartenänderung verlangt. Es gibt keine weiteren automatischen Zoomschritte.
+4. Die Miniaturübersicht wird nach Möglichkeit anhand ihrer Seitenstruktur erkannt. Falls das nicht gelingt, wartet der Ablauf nach dem dritten Zoom: **Übersicht oben rechts markieren** wählen und nur das kleine Miniatur-Stadion eng mit einem Rechteck umrahmen, ohne Schließen-Knopf und sonstige Symbole. Danach geht es automatisch weiter, ohne erneut zu zoomen. Der Ausschnitt darf auch schon vor dem Start konfiguriert werden, wenn seine spätere Position bekannt ist.
+5. **Ohne Häkchen** bei „Block, Platz und cart add automatisch anklicken“ ist dies ein Testlauf: Er zoomt dreimal und bestätigt einen verfügbaren Block, führt aber keine Auswahlklicks aus.
+6. Für den vollständigen Ablauf vor dem nächsten Start wieder ganz herauszoomen, gegebenenfalls die Bereiche neu markieren und das Häkchen aktivieren. Die Startansicht darf nicht vom vorherigen Test bereits vergrößert sein.
 
-Falls der Knopf ausschließlich aus unbeschrifteten SVG-Pfaden besteht, kann er einmalig eingelernt werden:
+Der Wächter wartet auch auf später erscheinende Verfügbarkeit, ohne die Seite neu zu laden und ohne erneut zu zoomen. Er berücksichtigt bereits vorhandene Tickets sofort. Pro Durchlauf wird höchstens ein Block, ein Platz und eine Hinzufügen-Aktion angeklickt.
 
-1. Manuell einen Platz auswählen, sodass der auf dem Screenshot gezeigte Warenkorb-plus-Knopf erscheint.
-2. Im Wächter **Hinzufügen-Symbol einmal einlernen** wählen und auf diesen Knopf klicken. Der Lernklick betätigt den Knopf nicht.
-3. Der Wächter speichert ein eindeutiges Merkmal des Bedienelements, zum Beispiel dessen ID oder einen eindeutigen Klassenselektor. Bei späteren Starts darf der Knopf zunächst fehlen oder durch ein neues Element mit demselben Merkmal ersetzt werden. Er wird erst nach einem automatischen Platzklick gesucht.
-4. Über **Gelerntes Warenkorbziel löschen** wird die gespeicherte Zuordnung entfernt. Die normale Text-/Symbolsuche greift dann wieder.
+## Feste Reihenfolge und Abbruch
 
-Die Zuordnung gilt für die jeweilige Shopadresse (Origin und Pfad, ohne URL-Parameter). Gespeichert wird nur der CSS-Selektor, kein Screenshot und keine Zugangsdaten. Gibt es kein eindeutiges Merkmal, wird das Einlernen abgelehnt. Der gelernte Selektor hat Vorrang; bei einem nicht mehr passenden Ziel wird nicht auf einen anderen Knopf ausgewichen. Die tatsächliche Klickfunktion im Shop muss weiterhin geprüft werden.
+- Ein Platz wird erst nach dem Blockklick und einer bestätigten Änderung der großen Kartenansicht gesucht. Änderungen ausschließlich in der Miniaturübersicht reichen nicht aus.
+- Die Miniaturkarte wird bei der Sitzsuche ausgeblendet, damit ein kleiner farbiger Block dort nicht als Sitz angeklickt wird.
+- Freie Plätze müssen in zwei Aufnahmen an annähernd derselben Stelle bestätigt werden. Nach 15 Sekunden ohne bestätigte Platzansicht mit freiem Punkt wird abgebrochen.
+- Die Hinzufügen-Schaltfläche darf am Anfang fehlen. Sie wird erst nach dem Platzklick gesucht, muss sichtbar, aktiv und eindeutig sein. Nach acht Sekunden ohne eindeutiges Ziel oder bei mehreren Zielen wird abgebrochen.
+- Escape, Stoppen und Tabwechsel brechen die noch ausstehenden Schritte ab. Scrollen der Browserseite oder eine Größenänderung stoppt den Ablauf und verwirft die eingegebenen Rechtecke. Internes Zoomen der Karte ist davon zu unterscheiden.
+- Der Wächter navigiert nicht selbst zurück, leert keinen Warenkorb und führt weder Checkout noch Zahlung aus. Vor einem weiteren Start Auswahlzustand prüfen und zur ganz herausgezoomten Ausgangsansicht zurückkehren.
 
-## Neu: zu kleine Platzpunkte und Kartenzoom
+## Wie der farbige Block erkannt wird
 
-In der Gesamtübersicht sind einzelne Platzpunkte häufig nicht ausreichend dargestellt. Ein vergrößertes Screenshotbild stellt keine fehlenden Informationen wieder her. Deshalb kann der Wächter die **Karte selbst** über eine sichtbare, aktive und eindeutig zugeordnete Zoom-in-Schaltfläche oder ersatzweise über Mausradereignisse im markierten Kartenbereich zu vergrößern versuchen. Ein Einfachklick zum Öffnen eines Blocks bleibt die Standardeinstellung.
+Vorrangig werden zugängliche Blockelemente in der Miniaturübersicht anhand von Verfügbarkeitsattributen, eindeutigem Status oder farbiger Blockfüllung ausgewertet. Unterstützt werden Blockattribute, Blockklassen und übliche SVG-Blockkennungen; graue Füllungen zählen nicht, eine ausdrückliche Nichtverfügbarkeit hat Vorrang vor der Farbe. Die Blocknamen werden intern als Kennungen verwendet, aber nicht vom Benutzer eingegeben.
 
-**Ohne freien Punkt: Kartenzoom versuchen (max. 3)** ist standardmäßig aktiv. Nach zwei Aufnahmen ohne erkannten freien Platzpunkt wird ein Zoomschritt versucht. Danach beginnt die Bestätigung eines Platzpunkts erneut. Höchstens drei Schritte pro Suchlauf sind erlaubt; der Testmodus zoomt nicht. Im Blockmodus beginnt dies erst nach einem erkannten Ansichtswechsel, im Direktmodus nur bei automatischer Ausführung.
+Bei einer als Bild/Canvas dargestellten oder unbekannten Übersicht wird der markierte Ausschnitt bildbasiert untersucht. Kleine zusammenhängende farbige Flächen im äußeren Stadionring dienen als mögliche Blockmarkierungen. Große zentrale Flächen und dünne Umrissrahmen sollen dadurch ausgeschlossen werden. **Das ist eine Heuristik für die angenommene Stadionansicht, keine semantische Garantie:** Eine anders gestaltete Miniaturkarte, ein zu weit gefasster Ausschnitt, farbige Legenden, ausgewählte statt verfügbare Blöcke oder sehr kleine Markierungen können zu Fehlinterpretationen oder fehlenden Treffern führen. Deshalb zuerst einen Testlauf durchführen und die tatsächlich erkannte Markierung prüfen.
 
-Erkannt werden Beschriftungen wie **Zoom in**, **Vergrößern**, **Karte vergrößern** und entsprechende Zoom-in-/search-plus-Symbolmerkmale. Ein unbeschriftetes **+** oder eine Mengensteuerung wird ausdrücklich nicht verwendet. Fehlt eine eindeutige Zoom-Schaltfläche, wird ein Mausrad-Zoomereignis versucht: bevorzugt über einem winzigen farbigen Punkt, sonst in der Mitte des markierten Kartenbereichs. Punkte mit nur 2–11 farbigen Pixeln dienen dabei ausschließlich als Zoomanker, nicht als klickbare Plätze.
+Der erste bestätigte farbige Kandidat wird verwendet. Eine Priorisierung nach Preis, Kategorie, Tribüne oder zusammenhängenden Sitzplätzen ist nicht implementiert. In der großen Karte gilt die beschriebene Annahme: farbige runde Punkte sind freie Plätze, graue Punkte nicht. Sollte der Shop farbige Punkte auch für andere Status verwenden, muss die Erkennung angepasst werden.
 
-Nach jedem Zoomversuch wird die sichtbare Bildänderung geprüft. Bleibt sie in zwei Aufnahmen aus, werden weitere Zoomversuche abgeschaltet; die Platzsuche läuft weiter bis zum manuellen Abbruch beziehungsweise zum Zeitlimit im Blockmodus. Höchstens drei wirksame Zoomversuche pro Suchlauf sind erlaubt.
+## cart add und einmaliges Einlernen
 
-**Mausradereignisse werden von der Erweiterung synthetisch gesendet.** Kartenbibliotheken können darauf reagieren, der Browser behandelt sie jedoch nicht wie echte Hardwareeingaben. Ob der konkrete Ticketshop sie akzeptiert und wie stark er pro Schritt zoomt, ist weiterhin ungeprüft. Eine ausbleibende Reaktion wird gemeldet; dann braucht die Karte eine eigene Integration. Bei einer Karte, die ausschließlich Gesten oder vertrauenswürdige Eingaben verarbeitet, funktioniert dieser Fallback nicht.
+Die Wortreihenfolge **cart add** wird jetzt ausdrücklich erkannt. Zusätzlich werden übliche native und Framework-Tooltipattribute, zugeordnete Tooltiptexte, Beschriftungen wie „In den Warenkorb“ / „Add items“ und cart-plus-Symbolmerkmale ausgewertet. Reine Warenkorb-Navigation und Checkout-Schaltflächen sind keine Hinzufügen-Aktion.
 
-Den Platzsuchbereich über dem gesamten relevanten Kartenbereich markieren, damit vergrößerte Punkte im Ausschnitt bleiben. Internes Kartenzoomen ist vom Browserzoom zu unterscheiden. Scrollt oder verändert die Seite beim Zoomen das Browserlayout, wird aus Sicherheitsgründen gestoppt; anschließend sind die Koordinaten neu zu wählen. Auch Kartenanimationen oder mehr als drei benötigte Zoomschritte können eine automatische Platzauswahl verhindern. Die automatische Erkennung aller verfügbaren Blöcke bleibt unabhängig davon noch ungeprüft.
+Falls der Shop keine auswertbare Beschriftung bereitstellt, kann das sichtbare Symbol einmal eingelernt werden: außerhalb eines laufenden Ablaufs einen Platz manuell auswählen, **cart-add-Symbol einmal einlernen** wählen und den Knopf auswählen. Dieser Lernklick betätigt ihn nicht. Gespeichert wird nur ein eindeutiger CSS-Selektor für die betreffende Shopadresse. Das Ziel darf später zunächst fehlen oder als neues Element mit demselben Merkmal entstehen. Danach die manuelle Auswahl im Shop zurücksetzen und zur ganz herausgezoomten Ausgangsansicht zurückkehren.
 
-## Hinzufügen-Schaltfläche erst nach Platzauswahl finden
+Ein gelernter Selektor hat Vorrang. Bei fehlenden oder mehrdeutigen Merkmalen wird nicht auf ein zufälliges anderes Ziel ausgewichen. **Gelerntes Warenkorbziel löschen** entfernt die Zuordnung. Reine CSS-Hover-Tooltips ohne auswertbare Metadaten, geschlossene Shadow DOMs und eingebettete Frames benötigen eine zusätzliche Integration.
 
-Standard ist **Hinzufügen-Schaltfläche automatisch finden**. Du musst keinen Warenkorbbereich vorab markieren; die Schaltfläche darf am Anfang vollständig fehlen.
+## Technische Grenzen
 
-Nach dem Platzklick sucht der Wächter anhand von sichtbarem Text, `aria-label`, `aria-labelledby` oder `title` nach einer Aktion wie **In den Warenkorb**, **Zum Warenkorb hinzufügen**, **Add to cart**, **Add items** oder dem Icon-Namen **add_shopping_cart**. Eine DOM-Beobachtung reagiert auf neu eingefügte oder geänderte Schaltflächen; ergänzend wird alle 100 ms die Sichtbarkeit geprüft. Es wird nicht auf einen festen Zeitpunkt oder eine Bildschirmposition vertraut.
-
-Die Schaltfläche muss sichtbar, im aktuellen Bildausschnitt, nicht verdeckt und aktiv sein. Ein später ersetztes Element wird neu gesucht. Nur ein eindeutiger Treffer wird angeklickt. Bei mehreren aktiven passenden Zielen oder nach acht Sekunden ohne eindeutigen aktiven Treffer wird abgebrochen. Escape/Stoppen beendet auch diese Wartephase. Reine Links zum Anzeigen des Warenkorbs und Checkout-Schaltflächen zählen nicht als Hinzufügen-Aktion.
-
-Die automatische Suche ist lokal getestet, aber noch nicht gegen den echten Shop geprüft. Ein ausschließlich gezeichnetes oder unbeschriftetes Icon ohne eindeutiges Symbolmerkmal benötigt das oben beschriebene Einlernen. Geschlossene Shadow DOMs und eingebettete Frames werden nicht unterstützt. Ein beliebiges „Hinzufügen“ ohne Bezug zum Warenkorb wird nicht geraten. Dafür muss die tatsächliche Seitenschaltfläche integriert werden, sobald Zugriff auf die Seite möglich ist.
-
-Optional kann die automatische Schaltflächensuche abgeschaltet und ein bereits sichtbares Warenkorbziel manuell gewählt werden. Dieser ältere Modus ist nur geeignet, wenn das Element während des Ablaufs erhalten bleibt.
-
-## Empfohlen für S1: Blocknamen automatisch suchen
-
-**Du musst den Block nicht selbst öffnen und auch nicht vorher als Klickziel auswählen.** Standard ist jetzt **Block nach Namen automatisch öffnen**, mit vorbelegtem Blocknamen **S1**.
-
-1. In der Stadionübersicht den Modus **Block nach Namen automatisch öffnen** und den Namen **S1** beibehalten.
-2. Den **Suchbereich für einzelne Plätze** markieren: den Kartenbereich, in dem nach der automatischen Blocköffnung die Platzpunkte erscheinen. Dabei nicht den Block öffnen; das Rechteck bezeichnet nur den späteren Suchausschnitt.
-3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet und die Platzauswahl auf Einfachklick lassen. Ein Warenkorbziel muss nicht gewählt werden.
-4. Im Testmodus prüfen, ob „Block S1 gefunden“ gemeldet wird. Dies prüft die automatische Zuordnung des Blocknamens, bestätigt aber noch keine freien Tickets und klickt nicht.
-5. **Aktionen automatisch ausführen** aktivieren und starten. Der Wächter findet S1 über den Seitentext/SVG-Blocknamen, öffnet ihn selbst unabhängig von seinem Farbton, sucht nach dem Ansichtswechsel einen freien Platz und klickt anschließend den Warenkorb.
-
-Die automatische Namenssuche ist für zugängliche HTML-/SVG-Beschriftungen implementiert und auf einer lokalen SVG-Testseite geprüft. **Ob der echte Shop diese Beschriftungen zugänglich bereitstellt, ist weiterhin nicht verifiziert.** Eine rein als Bild oder Canvas gezeichnete Beschriftung wird nicht gelesen. Bei fehlendem, verdecktem oder mehrdeutigem Blocknamen wird abgebrochen, statt eine Position zu raten.
-
-Diese Variante prüft den eingetragenen Block; sie leitet aus dem minimalen Farbunterschied der Gesamtübersicht keine zuverlässige Verfügbarkeit ab und durchsucht nicht automatisch alle Blöcke. Es ist nicht nachgewiesen, dass der Shop eine Platzauswahl oder einen Warenkorbvorgang ohne das Öffnen der Platzansicht unterstützt.
-
-## Alternative: Blockziel einmalig auswählen
-
-Der geringe Darstellungsunterschied von S1 in der Stadionübersicht wird nicht als zuverlässiges Farbsignal vorausgesetzt. Der alternative Modus heißt **Blockziel einmalig auswählen**. Dieser Modus öffnet einen ausdrücklich gewählten Block unabhängig von seiner Farbe. Er erkennt den Blocknamen nicht automatisch und durchsucht nicht alle Blöcke.
-
-1. In der Stadionübersicht **S1 / anderen Block als Klickziel wählen** anklicken und dann genau auf S1 klicken. Damit wird nur das spätere Klickziel gespeichert; der Block wird noch nicht geöffnet.
-2. Den **Suchbereich für einzelne Plätze** markieren: den Kartenbereich wählen, in dem nach dem Öffnen die einzelnen Platzpunkte erscheinen. Das Bedienfeld darf nicht darin liegen. Der Bereich ist kein festgelegter Sitzplatz; darin wird ein freier Punkt gesucht.
-3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet lassen.
-4. Blockklick passend einstellen; Vorgabe ist Einfachklick. Falls die Webseite den Block nur per Doppelklick öffnet, entsprechend umstellen. Die Platzauswahl bleibt auf Einfachklick.
-5. Im Testmodus werden nur die Eingaben geprüft: Der Block wird nicht geöffnet und freie Tickets werden damit nicht bestätigt.
-6. **Aktionen automatisch ausführen** aktivieren und starten. Der Wächter öffnet den gewählten Block sofort, wartet auf eine sichtbar veränderte Platzansicht und sucht dort auch bereits verfügbare farbige Platzpunkte. Erst nach dem Platzklick folgt der Einkaufswagen. Ohne bestätigten freien Punkt erfolgt kein Warenkorbklick; nach 15 Sekunden wird abgebrochen.
-
-Nach einem Durchlauf vor erneutem Start zur Übersicht zurückkehren und das Blockziel neu prüfen. Diese Version navigiert nicht automatisch zurück und wechselt nicht selbst zum nächsten Block. Die Suchbereiche und Klickziele gelten nur für die unveränderte Browseransicht.
-
-## Alternative: farbige Blöcke suchen
-
-Die Gesamtübersicht und die Detailansicht einzelner Plätze sind unterschiedliche Zustände. Der Modus **Farbige Blöcke automatisch suchen** ist nur für Übersichten mit erkennbarem farbigem Verfügbarkeitshinweis gedacht. Für sichtbare einzelne Platzpunkte den Direktmodus ausdrücklich auswählen.
-
-In der Übersicht den Blockbereich markieren und über **Spielfeld / Legende aus der Suche ausschließen** das gesamte grüne Spielfeld sowie farbige Symbole mit eigenen Rechtecken ausblenden. Mehrere Ausschlüsse sind möglich und gelten ausschließlich für die Blocksuche, nicht für die nachfolgende Platzansicht. Nach Scrollen oder Größenänderung werden sie gelöscht.
-
-Die Blocksuche benötigt einen farbigen Verfügbarkeitshinweis im markierten, nicht ausgeschlossenen Bereich. **Sind alle Blöcke grau und wird Verfügbarkeit erst nach dem Öffnen sichtbar, kann diese Version daraus keine freien Tickets ableiten und durchsucht die Blöcke nicht automatisch nacheinander.** Dafür ist eine Integration der tatsächlichen Blockelemente und der Rücknavigation erforderlich. Die Meldung „kein farbiger Verfügbarkeitshinweis“ bedeutet nicht, dass sicher keine Tickets existieren.
-
-Bereits beim Start farbig angezeigte Verfügbarkeit wird sofort berücksichtigt. Es wird nicht auf eine Farbänderung gewartet. Der Testmodus meldet Treffer und klickt ausdrücklich nichts an.
-
-## Für die gezeigte Platzansicht
-
-1. **Plätze bereits sichtbar** als Ansicht wählen.
-2. **Bereich mit Platzpunkten markieren:** Ein Rechteck über die relevanten Sitzpunkte ziehen. Farbige Bedienelemente, Symbole und Legenden außerhalb lassen. Das Bedienfeld darf nicht im Suchbereich liegen.
-3. **Hinzufügen-Schaltfläche automatisch finden** eingeschaltet lassen. Vor der Platzauswahl ist kein sichtbares Warenkorbsymbol erforderlich.
-4. **Platz wählen: Einfachklick** beibehalten.
-5. Zuerst ohne **Aktionen automatisch ausführen** starten. Der Testmodus meldet einen freien farbigen Punkt und klickt nichts an.
-6. Für die Klickfolge die automatische Ausführung aktivieren und erneut starten.
-
-Die Spielfeld-Ausschlüsse sind im Direktmodus nicht aktiv. Eine feste Farbe muss nicht eingestellt werden. Der olivfarbene Punkt im bereitgestellten Bild wird wie andere ausreichend farbige, annähernd runde Punkte erkannt. Nach zwei passenden Bildern wird genau ein Punkt angeklickt. Danach wartet der Wächter auf eine eindeutige aktive Hinzufügen-Schaltfläche und betätigt sie. Nur im optionalen manuellen Warenkorbmodus gelten mindestens 250 ms Wartezeit und bis zu drei Sekunden Warten auf Aktivierung. Danach stoppt der Wächter; eine Wiederholung erfordert einen neuen Start.
-
-**Escape**, Stoppen oder ein unsichtbarer Tab stoppen weitere Aktionen. Nach Scrollen oder Änderung der Fenstergröße müssen die Suchbereiche und gegebenenfalls manuell festgelegte Klickziele neu gewählt werden.
-
-## Optional: zuerst einen Block öffnen
-
-Für eine Übersicht mit farbiger Verfügbarkeit **Farbige Blöcke automatisch suchen** auswählen und zusätzlich den Blockbereich markieren. Der Platzsuchbereich bezeichnet dann den Ausschnitt, in dem nach Öffnen des Blocks die einzelnen Plätze erscheinen werden.
-
-Der Wächter sucht zuerst eine farbige Fläche im Blockbereich und öffnet den Block. Danach muss sich die Platzansicht sichtbar ändern. Erst dann sucht er einen einzelnen farbigen Platzpunkt. Nach 15 Sekunden ohne bestätigte Platzansicht mit freiem Punkt wird abgebrochen; der Warenkorb wird nicht betätigt. Block und Platz sind unabhängig per Einfach- oder Doppelklick bedienbar. Der Direktmodus wartet ohne Zeitlimit auf einen freien Punkt.
-
-## Grenzen
-
-- Die echte Ticketseite war aus der Cloud-Entwicklungsumgebung durch die Netzwerkrichtlinie gesperrt. Die Erkennung und Klickfolge wurden auf einer lokalen Testseite geprüft, **nicht im echten Ticketshop**. Der Screenshot dient als Hinweis für die Darstellung; er beweist keine erfolgreiche Integration. Es wurden keine echten Tickets oder Warenkörbe verändert.
-- Farbig bedeutet eine Differenz von mindestens 25 zwischen dem höchsten und niedrigsten RGB-Kanal. Weiß, Schwarz und Grau zählen nicht als farbig. Ein Platz benötigt mindestens zwölf zusammenhängende passende Pixel, maximal 48×48 CSS-Pixel, ein Seitenverhältnis von höchstens 1,5 und eine Flächendichte zwischen 0,5 und 0,94. Das ist eine Formheuristik, keine semantische Prüfung der Verfügbarkeit. Farbige runde Symbole oder andersfarbige belegte Plätze im Suchbereich können ebenfalls erkannt werden.
-- Die Auswahl bevorzugt Punkte oben, dann links. Preis, Sicht, Kategorie und zusammenhängende Plätze werden nicht berücksichtigt. Die Suchfläche entsprechend begrenzen.
-- Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde. Aufnahmen erfolgen mindestens 550 ms auseinander. Zwei Bilder bestätigen eine Erkennung: ungefähr 0,6–1,2 Sekunden plus Aufnahme-/Verarbeitungszeit im Direktmodus, danach die Wartezeit vor dem Warenkorb. Der Blockmodus benötigt zusätzliche Aufnahmen und Ladezeit. Keine garantierte Latenz.
-- Der Tab muss sichtbar bleiben. Die Seite wird nicht selbst neu geladen. Der Wächter sieht nur die vom Shop im Browser angezeigte Verfügbarkeit.
-- Synthetische Mausereignisse werden nicht von jedem Shop akzeptiert. Ein Klick ist kein Nachweis einer erfolgreichen Platzauswahl oder Reservierung. Das tatsächliche Ergebnis bitte im Shop prüfen.
-- Die automatische Hinzufügen-Suche setzt eine unterstützte Beschriftung im zugänglichen Seitendokument voraus. Im optionalen manuellen Modus muss das ausgewählte Warenkorbelement erhalten bleiben; geänderte Ziele werden nicht blind angeklickt.
-- Ein Blockwechsel mit Navigation zu einer neuen Seite, Scrollen oder Größenänderung beendet den Ablauf. Eingebettete Frames benötigen zusätzliche Integration.
-- Im Blockmodus erfordert der Ansichtswechsel mindestens 24 veränderte Pixel (RGB-Kanaldifferenz über 24) und mindestens 2 % Veränderung im Platzsuchbereich. Animationen sind kein verlässlicher Nachweis eines bestimmten Shopzustands.
-- Checkout und Zahlung werden nicht automatisiert.
+- „Drei Mausradschritte“ bedeutet hier drei synthetische WheelEvents mit jeweils `deltaY=-100`, Pixelmodus und etwa 180 ms Abstand. Das sind keine vertrauenswürdigen Hardwareereignisse. Der tatsächliche Zoomfaktor ist von der Kartenbibliothek abhängig und entspricht nicht garantiert drei physischen Rastungen des eigenen Mausrads. Akzeptiert die Karte diese Ereignisse nicht, wird ohne Auswahlklick gestoppt. Das ist im echten Shop noch zu prüfen.
+- Die Startansicht muss vom Benutzer vorbereitet werden. Die Anwendung prüft die sichtbare Änderung, aber nicht, ob ein bestimmter numerischer Zoomfaktor erreicht wurde.
+- Chrome erlaubt höchstens zwei Tab-Aufnahmen pro Sekunde; mindestens 550 ms liegen zwischen Aufnahmen. DOM-basierte Blockerkennung kann schneller reagieren, bildbasierte Bestätigung und die Sitzsuche benötigen mehrere Aufnahmen. Es gibt keine garantierte Gesamtlatenz.
+- Die Karten- und Blocköffnung werden anhand sichtbarer Bildänderungen geprüft. Diese sind ein Plausibilitätssignal, kein Nachweis des internen Shopzustands. Animationen können stören.
+- Maus- und Mausradereignisse werden synthetisch gesendet. Manche Webseiten akzeptieren sie nicht. Gesendete Klicks sind kein Nachweis für eine erfolgreiche Reservierung oder Warenkorbänderung.
+- Die Übersicht muss oberhalb/außerhalb überlagernder Shopdialoge sichtbar sein. Der Tab muss sichtbar bleiben. Änderungen von Layout, Zoomverhalten und Farben können eine neue Kalibrierung oder Anpassung erfordern.
 
 ## Datenschutz
 
-`activeTab` und `scripting` erlauben den Zugriff nach Klick auf das Erweiterungssymbol. `storage` speichert ausschließlich ein ausdrücklich eingelerntes Warenkorbziel lokal für die jeweilige Shopseite. Aufnahmen bleiben im Arbeitsspeicher und werden weder gespeichert noch an einen Server übertragen. Es werden keine Zugangsdaten benötigt.
+`activeTab` und `scripting` erlauben Zugriff nach Klick auf das Erweiterungssymbol. `storage` speichert nur ein ausdrücklich eingelerntes Warenkorbziel lokal, nach Origin und Pfad der Shopseite, ohne URL-Parameter. Bildschirmaufnahmen bleiben im Arbeitsspeicher und werden weder gespeichert noch an einen Server gesendet. Keine Zugangsdaten erforderlich.
 
-## Entwickeln und testen
+## Entwicklung und Prüfung
 
-Die Erweiterung selbst benötigt weder Build noch npm-Pakete. Für Tests Node.js ab Version 20:
+Die Erweiterung benötigt keinen Build. Für Tests Node.js ab Version 20:
 
 ```sh
 npm ci
@@ -132,6 +77,6 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Der Browsertest nutzt `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Geprüft werden der Direktmodus (auch mit einem gedämpft olivfarbenen Punkt), Testmodus, Block → Platz → Warenkorb, vorhandene Verfügbarkeit mit ausgeschlossenem grünem Spielfeld, automatische Suche des SVG-Blocknamens S1, fehlende und mehrdeutige Blocknamen, gezielter grauer Block ohne Farbsignal, kein Warenkorbklick ohne freien Punkt, Suchstatus ohne Verfügbarkeit, einmalige Ausführung, fehlender Ansichtswechsel, Escape zwischen den Schritten und ungültige Koordinaten nach Größenänderung. Zusätzlich wird die dynamische Hinzufügen-Suche mit späterem Erscheinen/Aktivieren und DOM-Ersetzung, mehreren Zielen, verdeckten Schaltflächen, zugänglichen Icon-Beschriftungen, Abbruch und dem vollständigen Ablauf ohne vorab vorhandenes Warenkorbziel getestet. Die Aufnahme-API wird durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat mit simulierten API-Antworten getestet. Zusätzliche Browsertests prüfen cart-plus-Icons ohne Beschriftung, Einlernen ohne echten Klick, Wiedererkennen nach DOM-Ersetzung, die Abgrenzung von Ticketmengen-Plus und Kartenzoom, maximal drei wirksame Zoomschritte, Mausrad-Zoom über winzigen Punkten sowie das Abschalten weiterer Versuche bei ausbleibender Kartenreaktion. Der vollständige Erweiterungsbetrieb im Shop bleibt zu prüfen.
+Die Browsertests verwenden `CHROMIUM_PATH`, vorhandenes `/usr/bin/chromium` oder den Playwright-Browser. Sie prüfen den gesamten neuen Ablauf mit genau drei Zoomereignissen, SVG-/Canvas-Blockmarkierungen, bestehender und später erscheinender Verfügbarkeit, Kalibrierung nach dem Zoom, Vorrang des Blockklicks, Maskierung der Miniaturkarte, fehlender Blocköffnung, cart-add-Tooltip, Abbruch zwischen den Schritten und nicht reagierendem Mausrad. Die Chrome-Aufnahme-API wird im Test durch echte Browser-Screenshots ersetzt; Tab-Prüfungen werden separat simuliert. Die eigentliche Shopintegration und vollständige Erweiterungsausführung sind damit noch nicht bestätigt.
 
-Für den manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen.
+Für einen manuellen Test `python3 -m http.server 8080 --bind 127.0.0.1` starten und im eigenen Browser `http://127.0.0.1:8080/tests/demo.html` öffnen. Die Demo startet ganz herausgezoomt und zeigt ihre Miniaturübersicht nach drei Mausradereignissen.

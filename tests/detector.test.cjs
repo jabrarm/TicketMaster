@@ -62,3 +62,18 @@ test('tiny colored points can anchor zoom but cannot be selected as seats',()=>{
   assert.ok(findAvailable(tiny,24,24,null,'tiny'));
   assert.equal(findAvailable(tiny,24,24,null,true),null);
 });
+test('miniature colored block marker is found while the central pitch and blue outline are excluded',()=>{
+  const width=160,height=120,data=new Uint8ClampedArray(width*height*4).fill(255);
+  const paint=(x,y,w,h,color)=>{for(let row=y;row<y+h;row++)for(let col=x;col<x+w;col++)data.set([...color,255],(row*width+col)*4);};
+  paint(56,40,48,35,[54,108,35]);
+  paint(48,30,64,1,[0,0,255]);paint(48,84,64,1,[0,0,255]);paint(48,30,1,55,[0,0,255]);paint(111,30,1,55,[0,0,255]);
+  assert.equal(findAvailable(data,width,height,null,'block-marker'),null);
+  paint(70,6,20,10,[163,165,108]);
+  const point=findAvailable(data,width,height,null,'block-marker');
+  assert.ok(point&&point.x>=70&&point.x<90&&point.y>=6&&point.y<16);
+});
+test('masked minimap changes cannot be mistaken for an opened main block view',()=>{
+  const before=frame([235,235,235]),after=frame([108,116,0]);
+  for(let i=3;i<before.length;i+=4){before[i]=0;after[i]=0;}
+  assert.equal(sceneChanged(before,after),false);
+});

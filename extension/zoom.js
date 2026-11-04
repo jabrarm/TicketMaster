@@ -22,12 +22,12 @@
     if(matches.length>1) throw new Error('Mehrere Zoomsteuerungen gefunden. Kein Zoomklick.');
     return matches[0]||null;
   }
-  function wheelIn(point, exclude) {
+  function wheelIn(point, exclude, deltaY = -240) {
     const element=document.elementFromPoint(point.x,point.y);
     if(!element || element===document.body || element===document.documentElement || element===exclude || exclude?.contains(element)) return false;
     // Map libraries commonly handle wheel events themselves. This does not
     // synthesize a trusted hardware event; callers must verify a visual change.
-    element.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,composed:true,view:window,clientX:point.x,clientY:point.y,deltaX:0,deltaY:-240,deltaMode:0}));
+    element.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,composed:true,view:window,clientX:point.x,clientY:point.y,deltaX:0,deltaY,deltaMode:0}));
     return true;
   }
   globalThis.TicketZoom={findZoomIn,wheelIn};

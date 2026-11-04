@@ -3,7 +3,8 @@
   function isAddAction(value) {
     const label = normalize(value);
     if (/\b(?:wishlist|remove|delete|entfernen|checkout|kasse|zahlen)\b/.test(label)) return false;
-    return /^add\s+(?:items?|tickets?)(?:\s*\(\d+\))?$/.test(label)
+    return /^(?:cart|basket) add$/.test(label)
+      || /^add\s+(?:items?|tickets?)(?:\s*\(\d+\))?$/.test(label)
       || /\badd\b.*\b(?:cart|basket)\b/.test(label)
       || /\bin (?:den|ihren|meinen) warenkorb\b/.test(label)
       || /\b(?:warenkorb|einkaufswagen)\b.*\bhinzufugen\b/.test(label)
@@ -37,7 +38,8 @@
     for (const element of elements) {
       if (element === exclude || exclude?.contains(element)) continue;
       const labelled = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
-      const labels = [element.getAttribute('aria-label'), element.getAttribute('title'), labelled, element.textContent, element.value];
+      const described = (element.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
+      const labels = [element.getAttribute('aria-label'), element.getAttribute('title'),element.getAttribute('data-original-title'),element.getAttribute('data-bs-title'),element.getAttribute('data-bs-original-title'),element.getAttribute('data-tooltip'),element.getAttribute('mattooltip'), labelled, described, element.textContent, element.value];
       if (!selector && !labels.some(isAddAction) && !iconAddsToCart(element)) continue;
       const point = pointFor(element);
       if (!point) continue;

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Bereichswächter",
-  "version": "0.6.1",
-  "description": "Erkennt freie Platzpunkte und wartet nach der Auswahl auf eine aktive Hinzufügen-Schaltfläche, auch wenn sie vorher noch nicht existiert.",
+  "version": "0.7.0",
+  "description": "Drei Mausradschritte aus der Gesamtansicht, verfügbaren Block aus der Miniaturübersicht öffnen, freien Platz wählen und cart add betätigen.",
   "permissions": [
     "activeTab",
     "scripting",

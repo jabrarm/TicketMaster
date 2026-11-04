@@ -24,6 +24,7 @@
   }
   function findAvailable(data, width, height, hex, seat = false) {
     const tiny = seat === 'tiny';
+    const blockMarker = seat === 'block-marker';
     if (hex && !/^#[0-9a-f]{6}$/i.test(hex)) throw new Error('Ungültige Verfügbarkeitsfarbe.');
     const color = hex ? [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)) : null;
     const mask = new Uint8Array(width * height);
@@ -48,7 +49,11 @@
       }
       const w = maxX - minX + 1, h = maxY - minY + 1;
       const density = queue.length / (w * h);
-      if (tiny) {
+      if (blockMarker) {
+        const cx=sx/queue.length,cy=sy/queue.length;
+        const radius=Math.hypot((cx-width/2)/(width/2),(cy-height/2)/(height/2));
+        if(queue.length<3 || queue.length>width*height*0.035 || w>width*0.3 || h>height*0.3 || density<0.45 || radius<0.48 || radius>1.15) continue;
+      } else if (tiny) {
         if(queue.length<2 || queue.length>11 || w>5 || h>5 || w/h>2 || h/w>2 || density<0.3) continue;
       } else if (queue.length < 12 || (seat && (w > 48 || h > 48 || w / h > 1.5 || h / w > 1.5 || density < 0.5 || density > 0.94))) continue;
       // Choose a matching pixel nearest the centroid (also safe for hollow shapes).
@@ -61,6 +66,7 @@
   function sceneChanged(before, after, minimumFraction = 0.02) {
     let changed = 0;
     for (let i = 0; i < before.length; i += 4) {
+      if(before[i+3]<128 || after[i+3]<128) continue;
       if (Math.max(...[0, 1, 2].map(c => Math.abs(before[i + c] - after[i + c]))) > 24) changed++;
     }
     return changed >= Math.max(24, before.length / 4 * minimumFraction);
