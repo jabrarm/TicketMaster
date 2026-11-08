@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Verfügbarkeitsmonitor",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Wählt Sitzplätze nach Ticketanzahl und Kategoriepräferenzen und übergibt bestätigte Plätze an den Warenkorb des Hospitality-Shops.",
   "permissions": [
     "activeTab",

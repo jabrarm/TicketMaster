@@ -1,11 +1,11 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.1.1
+# TicketMaster · Verfügbarkeit und Warenkorb 1.1.2
 
 Chrome-Erweiterung für den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine vollständig bestätigte Auswahl an den Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
 1. Den Branch `availability-monitor-v1` bzw. das ZIP der aktuellen Version herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.1.1**. Die zusätzliche Berechtigung `storage` speichert die Einstellungen lokal.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.1.2**. Die zusätzliche Berechtigung `storage` speichert die Einstellungen lokal.
 3. Die [Ticketseite](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) nach Installation oder Update neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen.
 4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
@@ -13,6 +13,8 @@ Chrome-Erweiterung für den Werder-Hospitality-Shop: freie Sitze aus strukturier
 7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
 
 Fehlende Seitenskripte werden beim Klick auf das Erweiterungssymbol nachgeladen, damit sich das Fenster auch in bereits geöffneten Tabs öffnet. Zum Erfassen aller Saalplan-Daten die Ticketseite dennoch nach Installation oder Update neu laden. Nicht unterstützte Seiten erhalten einen Hinweis. Verweigert Chrome die Skriptausführung, erscheint am Erweiterungssymbol ein rotes `!`; der Hinweis beim Darüberfahren nennt den Fehler.
+
+**Wichtig bei Updates:** Chrome kann den alten Code in der Seitenwelt eines bereits geöffneten Ticket-Tabs erhalten, während die aktualisierte Erweiterungsoberfläche schon läuft. Ein Erweiterungs-Neuladen allein ersetzt diesen Code nicht. Version 1.1.2 prüft deshalb die Versionen des Auswahlmoduls, des Beobachters und der Kategoriezuordnung. Bei gemischten Versionen erscheint **Update erkannt – Ticketseite neu laden** mit einem eigenen Neu-laden-Knopf. Erst nach dem Seitenneuladen, Öffnen des Saalplans und erneutem Starten der Automatik wird ausgewählt. Gespeicherte Präferenzen bleiben erhalten; ein Warenkorblauf wird nicht automatisch fortgesetzt.
 
 ## Kategorien und Präferenzen
 
@@ -71,7 +73,7 @@ Die Dekodierung folgt dem untersuchten Eventim-Saalplan-Client 6.20.0. Ein Sitz 
 
 `preferences.js` plant eine vollständige Auswahl anhand frischer Daten. `preferences-ui.js` stellt Gruppen, Unterkategorien, Sortierpfeile und Ticketanzahl bereit. `cart-flow.js` verwendet die untersuchten Shop-Funktionen `sms.selectById()` und `seatSelection.getSelectedSeats()`. Es wartet nach jeder Auswahl auf die Sitzkarte, prüft den bekannten Formularpfad des Events und verwendet `#add-to-cart`. Laufkennungen verhindern Wiederholungen desselben Laufs; ein bereits empfangener Stopp verhindert auch einen verspäteten Start.
 
-`monitor.js` läuft als isoliertes Content-Script. Über die Seitenbrücke werden normalisierte Sitzdaten und Statusmeldungen übergeben, keine Cookies, Request-Header, Signaturen oder API-Schlüssel. Warenkorbbefehle gehen über den Service-Worker, der Extension-Absender, Tab und Event-Adresse prüft. Der MAIN-Controller plant selbst noch einmal aus seinem eigenen zuletzt empfangenen Datenstand und den freigegebenen Präferenzen. Seitennachrichten können keine beliebigen IDs oder Browserbefehle einschleusen. Shoptexte werden als Text gerendert.
+`monitor.js` läuft als isoliertes Content-Script. Über die Seitenbrücke werden normalisierte Sitzdaten und Statusmeldungen übergeben, keine Cookies, Request-Header, Signaturen oder API-Schlüssel. Warenkorbbefehle gehen über den Service-Worker, der Extension-Absender, Tab, Event-Adresse und Modulversionen prüft. Der MAIN-Controller liest den Datenstand direkt vom Beobachter über `TicketDataObserver.getSnapshot()`; er ist nicht mehr auf eine separat initialisierte Kopie angewiesen. Auch ein erst nach den Netzwerkantworten erzeugter Controller erhält den vollständigen Stand. Vor jedem Auswahlschritt wird er erneut gelesen. Fehlende Daten, zu alte Daten und zu wenige passende Angebote werden mit unterschiedlichen Meldungen erklärt. Seitennachrichten können keine beliebigen IDs oder Browserbefehle einschleusen. Shoptexte werden als Text gerendert.
 
 Die Berechtigungen sind `activeTab`, `scripting` und `storage` sowie die beschränkte Content-Script-Zuordnung zum Shop-Pfad. `storage` speichert ausschließlich Einstellungen. `debugger` und Screenshots werden nicht verwendet. Die frühere Bild- und Klicksteuerung wurde entfernt.
 
@@ -88,7 +90,9 @@ npm run test:browser
 
 Die Browserprüfung nutzt `CHROMIUM_PATH`, `/usr/bin/chromium` oder einen installierten Playwright-Browser. Die Tests prüfen Dekodierung, Baseline, Versionswechsel, abgelaufene Daten, Fetch/XHR, Kategoriezuordnung, Sortierung, Nebeneinander-Präferenz, exakte Ticketanzahl, einzelne Shop-Bestätigungen, einmaligen Warenkorbklick und Stoppen mit kontrollierten Shopantworten. Der automatisierte Gesamttest ersetzt die Shopfunktionen und die Extension-Nachrichtenbrücke durch kontrollierte Testgegenstücke.
 
-Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Die Shopfunktionen und der Warenkorb-Formularpfad wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Warenkorbabschluss mit Version 1.1.1 ist daher noch nicht verifiziert.
+`tests/worlds.browser.cjs` ergänzt eine Prüfung mit tatsächlich getrennten Chrome-MAIN- und ISOLATED-Ausführungskontexten. Sie verwendet den tatsächlichen Hintergrund-Handler mit einem kontrollierten Chrome-API-Adapter. Getestet werden ein nach dem Erweiterungsupdate stehengebliebener alter Controller, der ausdrücklich ausgelöste Seitenreload und ein neuer Controller, dessen Beobachter die Netzwerkdaten schon vor seiner Erzeugung empfangen hat. Auch der vollständige Nachrichtenweg von der isolierten Oberfläche über den Hintergrund-Handler zur Platzwahl wird damit geprüft. Die Shop-Seitenauswahl selbst bleibt in diesem Test simuliert.
+
+Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Die Shopfunktionen und der Warenkorb-Formularpfad wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Warenkorbabschluss mit Version 1.1.2 ist daher noch nicht verifiziert.
 
 Beim lesenden Abgleich am 8. November 2026 wurden alle neun gelieferten Sitzangebote den vorgesehenen VIP-Unterkategorien zugeordnet. Shop-Schnittstelle und Ticketlimit von sechs waren vorhanden. Die API-Antwort war als abgelaufen markiert; Version 1.1.0 lieferte deshalb keine Auswahl. Version 1.1.1 verwendet solche kürzlich empfangenen Listen als Kandidaten und verlangt danach die Shop-Bestätigung. Der entsprechende Fehlerfall ist mit kontrollierten Shopantworten im Browser abgedeckt.
 

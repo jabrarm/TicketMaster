@@ -9,7 +9,7 @@ function setup(failing = false) {
       runtime: { id: 'test-extension', onMessage: { addListener: fn => { message = fn; } } },
       action: { onClicked: { addListener: fn => { click = fn; } },
         setBadgeText: async value => badges.push(value), setBadgeBackgroundColor: async () => {}, setTitle: async value => titles.push(value) },
-      scripting: { executeScript: async arg => { calls.push(arg); if (failing) throw new Error('Seitenzugriff verweigert'); } }
+      scripting: { executeScript: async arg => { calls.push(arg); if (failing) throw new Error('Seitenzugriff verweigert'); return [{ result: { requiresReload: false } }]; } }
     }
   });
   return { click, calls, badges, titles, message };
@@ -17,14 +17,15 @@ function setup(failing = false) {
 test('toolbar installs both script worlds before toggling, including in tabs open before installation', async () => {
   const { click, calls, badges } = setup();
   await click({}); assert.equal(calls.length, 0);
-  await click({ id: 19 }); assert.equal(calls.length, 3);
+  await click({ id: 19 }); assert.equal(calls.length, 4);
   assert.ok(calls.every(x => x.target.tabId === 19));
   assert.equal(calls[0].world, 'MAIN');
   assert.deepEqual(Array.from(calls[0].files), ['availability-core.js', 'preferences.js', 'cart-flow.js', 'page-observer.js']);
-  assert.equal(calls[1].world, 'ISOLATED');
-  assert.deepEqual(Array.from(calls[1].files), ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']);
+  assert.equal(calls[1].world, 'MAIN');
+  assert.equal(calls[2].world, 'ISOLATED');
+  assert.deepEqual(Array.from(calls[2].files), ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']);
   const events = [];
-  vm.runInNewContext('(' + calls[2].func.toString() + ')()', { window: { __ticketDataMonitor: true, dispatchEvent: event => events.push(event.type) }, CustomEvent: class { constructor(type) { this.type = type; } } });
+  vm.runInNewContext('(' + calls[3].func.toString() + ')()', { window: { __ticketDataMonitor: true, dispatchEvent: event => events.push(event.type) }, CustomEvent: class { constructor(type) { this.type = type; } } });
   assert.deepEqual(events, ['ticket-data-monitor-toggle']);
   assert.equal(badges[0].text, '');
 });

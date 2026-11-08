@@ -7,6 +7,11 @@
   const inventory = new Inventory();
   const channel = 'ticket-data-monitor-v1';
   let latest = null;
+  globalThis.TicketDataObserver = Object.freeze({
+    version: '1.1.2',
+    getSnapshot: () => inventory.last ? structuredClone(inventory.last) : null,
+    getError: () => latest?.type === 'error' ? latest.message : null
+  });
   let sequence = 0;
   const handled = new Map();
   const fresh = target => {

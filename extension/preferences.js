@@ -87,7 +87,7 @@
   // Expired API cache entries are candidate offers, never confirmed tickets.
   // Only the cart controller may use them, and must require each shop seat card.
   const candidates = (snapshot, config, now = Date.now()) => plan(snapshot, config, now, true);
-  const api = { catalog, allIds, defaults, validate, match, rank, plan, candidates };
+  const api = { version: '1.1.2', catalog, allIds, defaults, validate, match, rank, plan, candidates };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();
