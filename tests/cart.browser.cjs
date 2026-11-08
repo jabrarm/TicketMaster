@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
-const scripts = ['availability-core.js', 'preferences.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
+const scripts = ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
 async function setup(browser, delay = 0, expired = false) {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -28,8 +28,14 @@ async function setup(browser, delay = 0, expired = false) {
     if (url.hostname === 'www.ticket-onlineshop.com') return route.fulfill({ contentType: 'text/html', body: html });
     return route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data[url.pathname.split('/').at(-2)]) });
   });
-  await page.addInitScript({ content: `window.commands=[];window.savedPrefs=null;
-    window.chrome={runtime:{sendMessage:async message=>{window.commands.push(message);return message.type==='cartStop'?globalThis.TicketCartFlow.cancel(message.run):globalThis.TicketCartFlow.start(message.config,message.run);}},storage:{local:{get:async()=>({ticketPreferencesV1:window.savedPrefs}),set:async data=>{window.savedPrefs=data.ticketPreferencesV1;}}}};
+  await page.addInitScript({ content: `window.commands=[];window.savedPrefs=null;window.testGoal=null;window.testRun=null;
+    window.chrome={runtime:{sendMessage:async message=>{window.commands.push(message);
+      if(message.type==='goalGet')return{goal:null};
+      if(message.type==='goalBegin'){window.testGoal={id:'fixture-goal',config:message.config,target:message.config.quantity,confirmed:[],secured:[],status:'watching'};return{goal:window.testGoal};}
+      if(message.type==='goalStop'){if(window.testRun)globalThis.TicketCartFlow.cancel(window.testRun);window.testGoal.status='stopped';return{goal:window.testGoal};}
+      if(message.type==='cartStop')return globalThis.TicketCartFlow.cancel(message.run);
+      window.testRun=message.run;return{...await globalThis.TicketCartFlow.start(message.config,message.run),goal:{...window.testGoal,status:'submitting'}};
+    }},storage:{local:{get:async()=>({ticketPreferencesV1:window.savedPrefs}),set:async data=>{window.savedPrefs=data.ticketPreferencesV1;}}}};
     ` + scripts });
   await page.goto(pageUrl);
   for (const kind of ['seatmap', 'mapping', 'availability']) await page.evaluate(async url => (await fetch(url)).json(), `https://public-api.eventim.com/seatmap/api/public/${kind}/${identity}`);

@@ -13,6 +13,7 @@ async function setup(browser, legacy) {
     document.querySelector('#add-to-cart').onclick=e=>{e.preventDefault();window.cartCalls++;};</script>`;
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
+    if(url.pathname.endsWith('/shoppingcart'))return route.fulfill({contentType:'text/html',body:'<!doctype html><div class="empty-state">Keine Tickets</div><a id="continue-shopping-button">Weiter einkaufen</a>'});
     return url.hostname === 'www.ticket-onlineshop.com' ? route.fulfill({ contentType: 'text/html', body: html }) : route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data[url.pathname.split('/').at(-2)]) });
   });
   await page.goto(pageUrl);
@@ -24,8 +25,9 @@ async function setup(browser, legacy) {
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
     return result.result.value;
   }
-  let click, handleMessage, reloads = 0; const commands = [];
-  vm.runInNewContext(source('background.js'), { console, chrome: {
+  let click, handleMessage, reloads = 0; const commands = [], stored = {};
+  const sandbox = { console, URL, crypto: globalThis.crypto, chrome: {
+    storage: { session: { get: async key => ({ [key]: structuredClone(stored[key]) }), set: async data => { Object.assign(stored, structuredClone(data)); } } },
     action: { onClicked: { addListener: fn => { click = fn; } }, setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {}, setTitle: async () => {} },
     runtime: { id: 'worlds-test-extension', onMessage: { addListener: fn => { handleMessage = fn; } } },
     tabs: { reload: async id => { assert.equal(id, 19); reloads++; } },
@@ -34,7 +36,10 @@ async function setup(browser, legacy) {
       const expression = options.files ? options.files.map(source).join('\n') : '(' + options.func.toString() + ')(...' + JSON.stringify(options.args || []) + ')';
       return [{ frameId: 0, result: await evaluate(expression, options.world) }];
     } }
-  } });
+  } };
+  const context = vm.createContext(sandbox);
+  sandbox.importScripts = name => vm.runInContext(source(name), context);
+  vm.runInContext(source('background.js'), context);
   await cdp.send('Runtime.addBinding', { name: 'ticketBridgeCall', executionContextId });
   cdp.on('Runtime.bindingCalled', event => {
     if (event.name !== 'ticketBridgeCall' || event.executionContextId !== executionContextId) return;
@@ -64,7 +69,7 @@ async function setup(browser, legacy) {
     assert.equal(await old.page.evaluate(() => window.oldStarts), 0);
     await notice.getByRole('button', { name: 'Ticketseite neu laden' }).click();
     await old.page.waitForTimeout(100);
-    assert.equal(old.reloads(), 1); assert.deepEqual(old.commands, ['cartReload']);
+    assert.equal(old.reloads(), 1); assert.equal(old.commands.filter(c => c === 'cartReload').length, 1);
     assert.equal(await old.page.evaluate(() => window.cartCalls), 0);
     console.log('PASS: a mixed-version tab shows an explicit update notice; the actual background handler reloads the sender tab only on click and never invokes the obsolete controller');
     await old.page.close();
@@ -79,7 +84,7 @@ async function setup(browser, legacy) {
     await current.page.waitForFunction(() => window.cartCalls === 1);
     await current.page.waitForFunction(() => document.querySelector('#ticket-data-monitor').shadowRoot.querySelector('#cart-status').textContent.includes('bestätigte Plätze'));
     assert.deepEqual(await current.page.evaluate(() => window.selected.map(s => s.id)), ['s1001']);
-    assert.deepEqual(current.commands, ['cartStart']);
+    assert.equal(current.commands.filter(c => c === 'cartStart').length, 1);
     console.log('PASS: real MAIN and ISOLATED worlds exchange messages through the actual background handler; a late-created cart controller reads the observer inventory and completes confirmed selection exactly once');
     await current.page.close();
   } finally { await browser.close(); }

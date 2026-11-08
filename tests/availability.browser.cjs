@@ -18,7 +18,7 @@ const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
       if (delayNext) { delayNext = false; await new Promise(resolve => { release = resolve; }); }
       return route.fulfill({ status: unchanged ? 304 : failure ? 503 : 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: unchanged ? '' : body });
     });
-    const scripts = ['availability-core.js', 'preferences.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
+    const scripts = ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
     await page.addInitScript({ content: scripts });
     await page.goto(pageUrl);
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle')));
@@ -111,7 +111,7 @@ const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
     await late.evaluate(() => window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle')));
     assert.equal(await late.locator('#ticket-data-monitor').count(), 0, 'reproduces the old silent click before script installation');
     const inject = async () => {
-      for (const name of ['availability-core.js', 'preferences.js', 'cart-flow.js', 'page-observer.js', 'availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']) {
+      for (const name of ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js', 'availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']) {
         await late.addScriptTag({ content: fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8') });
       }
       await late.evaluate(() => window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle')));

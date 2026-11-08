@@ -87,7 +87,31 @@
   // Expired API cache entries are candidate offers, never confirmed tickets.
   // Only the cart controller may use them, and must require each shop seat card.
   const candidates = (snapshot, config, now = Date.now()) => plan(snapshot, config, now, true);
-  const api = { version: '1.1.2', catalog, allIds, defaults, validate, match, rank, plan, candidates };
+  function partialCandidates(snapshot, config, remaining = config.quantity, secured = [], now = Date.now()) {
+    validate(config);
+    if (!Number.isInteger(remaining) || remaining < 1 || remaining > config.quantity) return null;
+    const excluded = new Set(secured.map(s => Number(s.id)));
+    const available = snapshot ? { ...snapshot, seats: snapshot.seats.filter(s => !excluded.has(s.id)) } : null;
+    for (let count = remaining; count >= 1; count--) {
+      const result = candidates(available, { ...config, quantity: count }, now);
+      if (!result) continue;
+      // A later single ticket may extend the already secured group. Otherwise
+      // the category order remains the fallback; no seat is held back waiting.
+      if (config.adjacent && count === 1 && secured.length) {
+        const anchors = secured.filter(s => s.inventory === snapshot.inventory && s.version === snapshot.version);
+        const last = anchors.at(-1), ranks = rank(config);
+        if (last?.group) {
+          const neighbours = available.seats.filter(s => ranks.has(match(s)) && s.group === last.group && anchors.some(a =>
+            Math.abs(s.order - a.order) === 1 && Math.abs(s.id - a.id) === 1 && Number.isFinite(s.spacing) && Math.hypot(s.x - a.x, s.y - a.y) <= s.spacing * 1.6));
+          neighbours.sort((a, b) => ranks.get(match(a)) - ranks.get(match(b)) || a.id - b.id);
+          if (neighbours.length) return { seats: [neighbours[0]], adjacent: true };
+        }
+      }
+      return result;
+    }
+    return null;
+  }
+  const api = { version: '1.2.0', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

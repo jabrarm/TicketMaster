@@ -52,3 +52,12 @@ test('recently received expired cache entries are tentative cart candidates, nev
   assert.equal(prefs.candidates({ ...current, checkedAt: Date.now() - 120001 }, config), null);
   assert.equal(prefs.candidates({ ...current, checkedAt: NaN }, config), null);
 });
+test('partial planning takes an available single now, excludes secured seats, and prefers its later neighbour', () => {
+  const config = { ...prefs.defaults(), quantity: 2 };
+  const current = snapshot([seat(10, 'PK8 VIP-Rang Gold', { group: 'g', order: 0, x: 0, y: 0, spacing: 10 })]);
+  assert.equal(prefs.partialCandidates(current, config).seats.length, 1);
+  const secured = [{ ...current.seats[0], inventory: current.inventory, version: current.version }];
+  current.seats.push(seat(1), seat(11, 'PK8 VIP-Rang Gold', { group: 'g', order: 1, x: 10, y: 0, spacing: 10 }));
+  const remaining = prefs.partialCandidates(current, config, 1, secured);
+  assert.equal(remaining.seats[0].id, 11); assert.equal(remaining.adjacent, true);
+});

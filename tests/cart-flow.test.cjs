@@ -55,3 +55,10 @@ test('expired cache candidates still require full shop confirmation, and old HTT
   await assert.rejects(old.controller.start(old.config, 'run-test-01'));
   assert.equal(old.calls.length, 0); assert.equal(old.clicks(), 0);
 });
+test('preparing a smaller batch cannot submit until the background explicitly commits it', async () => {
+  const s = setup();
+  s.controller.updateSnapshot({ inventory: 'tixx-1001-674379', version: '1', checkedAt: 10000, seats: [{ id: 1, category: 'PK8 VIP-Rang Platin', block: 'N1', row: '20' }] });
+  const prepared = await s.controller.prepare(s.config, 'run-test-01');
+  assert.equal(prepared.count, 1); assert.equal(s.clicks(), 0);
+  assert.equal(s.controller.submit('run-test-01').count, 1); assert.equal(s.clicks(), 1);
+});

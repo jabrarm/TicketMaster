@@ -5,6 +5,7 @@
   const tracker = new Tracker();
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
   let preferences, config = globalThis.TicketPreferences.defaults(), armed = false, inFlight = false, runId = null, cartMessage = '', submitted = false;
+  let goal = null, actionEpoch = 0;
   const text = (tag, value, parent) => {
     const node = document.createElement(tag); node.textContent = value; parent?.append(node); return node;
   };
@@ -25,7 +26,7 @@
     </style><section aria-label="Ticket-Verfügbarkeit"><header><div><h1>Ticket-Verfügbarkeit</h1><span class="muted">Shopdaten · ohne Farberkennung</span></div><button class="close" aria-label="Schließen">×</button></header><main>
       <div class="controls"><button id="start" class="primary">Überwachung starten</button><button id="stop" disabled>Stoppen</button></div>
       <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p>
-      <div id="preferences"></div><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
+      <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
       <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
       <label>Block <select id="block" aria-label="Block filtern"><option value="">Alle Blöcke</option></select></label>
       <table><thead><tr><th>Block / Reihe</th><th>Sitz-ID</th><th>Kategorie</th></tr></thead><tbody id="seats"></tbody></table>
@@ -40,15 +41,24 @@
     preferences = globalThis.TicketPreferencePanel.create(ui.querySelector('#preferences'), value => { config = value; render(); });
     config = preferences.get();
     preferences.lock(armed || inFlight);
-    ui.querySelector('#auto').onclick = () => {
+    ui.querySelector('#auto').onclick = async () => {
       if (submitted || armed || inFlight) return;
+      const epoch = ++actionEpoch;
       config = preferences.get();
       try { globalThis.TicketPreferences.validate(config); if (![...globalThis.TicketPreferences.rank(config)].length) throw new Error('Bitte mindestens eine Unterkategorie auswählen.'); }
       catch (e) { cartMessage = e.message; render(); return; }
-      if (!running) start();
-      armed = true; runId = crypto.randomUUID(); preferences.lock(true);
-      cartMessage = 'Automatik wartet auf ' + config.quantity + ' passende, aktuelle Plätze. Nebeneinander wird ' + (config.adjacent ? 'bevorzugt.' : 'nicht vorausgesetzt.');
-      render(); void maybeCart();
+      inFlight = true; preferences.lock(true); render();
+      try {
+        const started = await chrome.runtime.sendMessage({ type: 'goalBegin', config });
+        if (!started?.goal) throw new Error(started?.error || 'Die Suche konnte nicht gespeichert werden.');
+        if (epoch !== actionEpoch) { await chrome.runtime.sendMessage({ type: 'goalStop', goalId: started.goal.id }); inFlight = false; preferences.lock(false); render(); return; }
+        goal = started.goal;
+        if (goal.status === 'completed') { submitted = true; inFlight = false; armed = false; preferences.lock(false); cartMessage = 'Die gewünschte Ticketanzahl ist bereits im Warenkorb bestätigt.'; render(); return; }
+        if (!running) start();
+        armed = true; runId = null; inFlight = false;
+        cartMessage = 'Suche nach ' + config.quantity + ' Tickets gestartet. Auch einzelne passende Angebote werden sofort im Shop geprüft.';
+        render(); void maybeCart();
+      } catch (e) { inFlight = false; preferences.lock(false); cartMessage = e.message; render(); }
     };
     render();
   }
@@ -57,7 +67,12 @@
     render(); window.postMessage({ channel, type: 'request' }, location.origin);
   }
   function stop() {
+    actionEpoch++;
     running = false; armed = false;
+    if (goal && typeof chrome !== 'undefined') {
+      void chrome.runtime.sendMessage({ type: 'goalStop', goalId: goal.id }).then(result => { if (result?.goal) goal = result.goal; }).catch(() => {});
+      cartMessage = 'Suche gestoppt. Bereits hinzugefügte Tickets bleiben im Warenkorb.';
+    }
     if (inFlight && typeof chrome !== 'undefined') {
       chrome.runtime.sendMessage({ type: 'cartStop', run: runId }).catch(() => {});
       cartMessage = 'Stoppen angefordert. Bereits ausgewählte Plätze bitte im Shop prüfen.';
@@ -68,19 +83,21 @@
   async function maybeCart() {
     if (!armed || inFlight || !running) return;
     if (!last || error) { cartMessage = error ? 'Automatik wartet: ' + error : 'Automatik wartet auf die Sitzangebote des Shops.'; render(); return; }
-    const plan = globalThis.TicketPreferences.candidates(last, config);
+    const remaining = goal ? goal.target - goal.confirmed.length : config.quantity;
+    const plan = globalThis.TicketPreferences.partialCandidates(last, config, remaining, goal?.secured || []);
     if (!plan) {
       const tooOld = Date.now() - last.checkedAt > 120000;
-      cartMessage = tooOld ? 'Automatik wartet: Seit über zwei Minuten keine Shopantwort. Bitte den Saalplan neu laden.' : 'Automatik wartet: Nicht genügend Sitzangebote für ' + config.quantity + ' Tickets in deinen gewählten Unterkategorien.';
+      cartMessage = tooOld ? 'Automatik wartet: Seit über zwei Minuten keine Shopantwort. Bitte den Saalplan neu laden.' : 'Automatik wartet auf die noch fehlenden ' + remaining + ' Tickets. Bereits im Warenkorb bestätigte Plätze werden nicht erneut gewählt.';
       render(); return;
     }
-    const currentRun = runId;
-    const placement = config.quantity === 1 ? 'nach Kategoriepräferenz' : plan.adjacent ? 'nebeneinander nach Saalplan' : 'nach Kategoriepräferenz, einzeln verteilt';
-    inFlight = true; cartMessage = 'Prüfe ' + config.quantity + (config.quantity === 1 ? ' Sitzangebot ' : ' Sitzangebote ') + placement + ' durch die Platzwahl im Shop. Warenkorbübergabe erst nach Bestätigung …'; render();
+    const currentRun = crypto.randomUUID(); runId = currentRun;
+    const count = plan.seats.length, placement = count === 1 ? 'nach Kategoriepräferenz' : plan.adjacent ? 'nebeneinander nach Saalplan' : 'nach Kategoriepräferenz, einzeln verteilt';
+    inFlight = true; cartMessage = 'Prüfe ' + count + (count === 1 ? ' Sitzangebot ' : ' Sitzangebote ') + placement + ' durch die Platzwahl im Shop. Warenkorbübergabe erst nach Bestätigung …'; render();
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'cartStart', run: currentRun, config });
-      if (result?.stage !== 'submitted') throw new Error(result?.error || 'Die Übergabe wurde nicht bestätigt. Bitte Auswahl und Warenkorb im Shop prüfen.');
-      submitted = true; cartMessage = result.count + ' bestätigte Plätze an den Warenkorbablauf des Shops übergeben. Den tatsächlichen Warenkorbinhalt bitte dort prüfen.';
+      const result = await chrome.runtime.sendMessage({ type: 'cartStart', run: currentRun, config, goalId: goal?.id });
+      if (!['submitted', 'awaitingCart'].includes(result?.stage)) throw new Error(result?.error || 'Die Übergabe wurde nicht bestätigt. Bitte Auswahl und Warenkorb im Shop prüfen.');
+      if (result.goal) goal = result.goal;
+      submitted = true; cartMessage = result.count + ' bestätigte Plätze an den Warenkorbablauf des Shops übergeben. Erst die Warenkorbseite bestätigt den Fortschritt; danach wird nur die Restmenge gesucht.';
     } catch (e) { cartMessage = 'Automatik angehalten: ' + e.message + ' Kein automatischer Wiederholungsversuch.'; }
     finally { armed = false; inFlight = false; preferences?.lock(false); render(); }
   }
@@ -89,6 +106,7 @@
     ui.querySelector('#start').disabled = running || !eventId(location.href); ui.querySelector('#stop').disabled = !running;
     ui.querySelector('#auto').disabled = armed || inFlight || submitted || !eventId(location.href);
     ui.querySelector('#cart-status').textContent = cartMessage || 'Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.';
+    ui.querySelector('#goal-progress').textContent = goal ? goal.confirmed.length + ' / ' + goal.target + ' Tickets zuletzt im Warenkorb bestätigt.' : '';
     preferences?.snapshot(last);
     const status = ui.querySelector('#status');
     const stale = last && Date.now() - last.checkedAt > 120000;
@@ -148,4 +166,19 @@
   });
   setInterval(() => { if (running) render(); }, 15000);
   window.__ticketDataMonitor = true;
+  async function resumeGoal() {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage || !eventId(location.href)) return;
+    const epoch = actionEpoch;
+    const result = await chrome.runtime.sendMessage({ type: 'goalGet' });
+    if (epoch !== actionEpoch) return;
+    if (!result?.goal) return;
+    goal = result.goal; mount(); config = goal.config; preferences.set(config);
+    if (goal.status === 'watching') {
+      start(); armed = true; preferences.lock(true); cartMessage = goal.confirmed.length + ' von ' + goal.target + ' Tickets bestätigt. Suche wird für die Restmenge fortgesetzt.';
+      await chrome.runtime.sendMessage({ type: 'goalOpen', goalId: goal.id });
+      render(); void maybeCart();
+    } else { cartMessage = goal.message || 'Warenkorbübergabe noch unbestätigt. Bitte den Warenkorb prüfen; kein automatischer Wiederholungsversuch.'; submitted = goal.status === 'completed' || Boolean(goal.pending); render(); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { void resumeGoal().catch(() => {}); }, { once: true });
+  else void resumeGoal().catch(() => {});
 })();

@@ -1,20 +1,22 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.1.2
+# TicketMaster · Verfügbarkeit und Warenkorb 1.2.0
 
 Chrome-Erweiterung für den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine vollständig bestätigte Auswahl an den Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
 1. Den Branch `availability-monitor-v1` bzw. das ZIP der aktuellen Version herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.1.2**. Die zusätzliche Berechtigung `storage` speichert die Einstellungen lokal.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.2.0**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
 3. Die [Ticketseite](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) nach Installation oder Update neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen.
 4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
 6. Für die Automatik **Anzahl Tickets** von 1 bis 6 einstellen. Kategorien über die Gruppen-Häkchen komplett auswählen, Unterkategorien bei Bedarf abwählen und Gruppen sowie Unterkategorien mit **↑ / ↓** sortieren. Oben steht die höchste Präferenz. Über das Dreieck lassen sich Unterkategorien ein- und ausklappen.
 7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
 
+**Neu in 1.2.0:** Ist beispielsweise das Ziel **2 Tickets**, aber nur **1 passender Platz** verfügbar, wird dieser sofort einzeln ausgewählt und an den Warenkorb übergeben. Erst die Warenkorbseite bestätigt den Fortschritt **1/2**. Danach kehrt die Erweiterung automatisch zu derselben Ticketseite zurück, öffnet den Saalplan und sucht nur das noch fehlende Ticket. Bei **2/2** bleibt sie im Warenkorb. Checkout und Zahlung erfolgen manuell. Die Reservierungsfrist des Shops läuft während der weiteren Suche weiter.
+
 Fehlende Seitenskripte werden beim Klick auf das Erweiterungssymbol nachgeladen, damit sich das Fenster auch in bereits geöffneten Tabs öffnet. Zum Erfassen aller Saalplan-Daten die Ticketseite dennoch nach Installation oder Update neu laden. Nicht unterstützte Seiten erhalten einen Hinweis. Verweigert Chrome die Skriptausführung, erscheint am Erweiterungssymbol ein rotes `!`; der Hinweis beim Darüberfahren nennt den Fehler.
 
-**Wichtig bei Updates:** Chrome kann den alten Code in der Seitenwelt eines bereits geöffneten Ticket-Tabs erhalten, während die aktualisierte Erweiterungsoberfläche schon läuft. Ein Erweiterungs-Neuladen allein ersetzt diesen Code nicht. Version 1.1.2 prüft deshalb die Versionen des Auswahlmoduls, des Beobachters und der Kategoriezuordnung. Bei gemischten Versionen erscheint **Update erkannt – Ticketseite neu laden** mit einem eigenen Neu-laden-Knopf. Erst nach dem Seitenneuladen, Öffnen des Saalplans und erneutem Starten der Automatik wird ausgewählt. Gespeicherte Präferenzen bleiben erhalten; ein Warenkorblauf wird nicht automatisch fortgesetzt.
+**Wichtig bei Updates:** Chrome kann den alten Code in einem bereits geöffneten Ticket-Tab erhalten. Ein Erweiterungs-Neuladen allein ersetzt diesen Code nicht. Die Modulversionen werden deshalb geprüft; bei gemischten Versionen erscheint **Update erkannt – Ticketseite neu laden**. Vor einem Erweiterungsupdate eine laufende Suche stoppen, danach die Ticketseite neu laden. Gespeicherte Präferenzen bleiben erhalten.
 
 ## Kategorien und Präferenzen
 
@@ -32,19 +34,25 @@ Die beiden Ost-Bezeichnungen sind verschiedene Shopkategorien; der abschließend
 
 Auf der weiterhin verwendeten **Hospitality-Adresse werden VIP-Angebote geliefert**. Die normalen Platzkategorien 1–5 stehen als Einstellungsstruktur bereit, haben dort aber keine passenden Angebote. Ihre Zuordnung erfordert ausdrücklich passende Preis- und Regionsdaten; aus einer Blocknummer oder Farbe wird keine Kategorie geraten. Allgemeine Einlass-/Stehplatzkontingente und Ermäßigungsvarianten werden in dieser Version nicht automatisiert. Nicht zuordenbare Sitzangebote bleiben sichtbar, werden aber nicht automatisch gewählt.
 
-Ticketanzahl, Reihenfolge, Häkchen und Nebeneinander-Präferenz werden lokal in der Erweiterung gespeichert. Nach Neuladen oder Öffnen eines Tabs startet die Automatik niemals selbstständig. Der Blockfilter der Übersicht verändert nur die Anzeige, nicht die Kategoriepräferenzen der Automatik.
+Ticketanzahl, Reihenfolge, Häkchen und Nebeneinander-Präferenz werden lokal gespeichert. Eine neue Suche startet nur durch **Automatisch in den Warenkorb**. Ein ausdrücklich gestartetes, noch nicht abgeschlossenes Suchziel wird im selben Tab nach den notwendigen Shop-/Warenkorb-Seitenwechseln fortgesetzt. Ein neuer Tab erhält keine laufende Suche eines anderen Tabs. Der Blockfilter der Übersicht verändert nur die Anzeige, nicht die Kategoriepräferenzen der Automatik.
 
 Für die Nebeneinander-Präferenz werden dieselbe Saalplan-Reihengruppe, aufeinanderfolgende Sitzpositionen und IDs sowie der geometrische Abstand geprüft. Dies ist eine konservative Ableitung aus dem Saalplan, keine unabhängig bestätigte Sitznummern-Garantie. Existiert unter den gewählten Optionen eine passende Gruppe, wird sie bevorzugt, auch gegenüber einzelnen Sitzen einer höher sortierten Kategorie. Unter passenden Gruppen entscheidet die Kategoriepräferenz. Ohne passende Gruppe werden die bestplatzierten Einzelsitze gewählt; diese können aus unterschiedlichen erlaubten Unterkategorien stammen.
 
+Es wird nicht auf die gesamte Zielanzahl gewartet, wenn schon ein Teil verfügbar ist. Nach einem übernommenen Einzelticket wird ein später angebotener Nachbarsitz bevorzugt, sofern die Geometrie und Saalplan-Version das eindeutig erlauben. Andernfalls gilt deine Kategoriepräferenz. Bei getrennten Übernahmen ist Nebeneinandersitzen nicht garantiert.
+
 ## Automatischer Ablauf und Stoppen
 
-Die Automatik wählt zunächst die gesamte gewünschte Anzahl anhand der Sitz-IDs aus. Jeder Sitz muss in der Auswahl des Shops und als gerenderte Sitzkarte bestätigt sein. Erst dann wird einmal der normale **In den Warenkorb**-Knopf betätigt. Navigation und tatsächliche Reservierung übernimmt der Shop. Eine Übergabemeldung der Erweiterung ersetzt keine Bestätigung des Warenkorbinhalts. Checkout und Zahlung sind nicht automatisiert.
+Die Automatik wählt die aktuell verfügbare Teilmenge, maximal die noch fehlende Anzahl, anhand der Sitz-IDs aus. Jeder Sitz dieser Teilauswahl muss im Shop und als gerenderte Sitzkarte bestätigt sein. Vor der Übergabe liest sie den bestehenden Warenkorb per normalem GET. Der Hintergrundprozess speichert die ausstehende Übergabe vor dem einmaligen Klick auf **In den Warenkorb**, damit der anschließende Seitenwechsel keinen Fortschritt verliert.
 
-Bereits vor dem Start im Saalplan ausgewählte Plätze verhindern den automatischen Lauf; sie werden nicht eigenständig entfernt. Die Anzahl bezeichnet die in diesem Lauf neu hinzuzufügenden Tickets. Ein bereits bestehender Warenkorb wird nicht geleert. Nach einer Übergabe startet im selben Monitorfenster kein zweiter automatischer Lauf. Bei Fehlern wird nicht automatisch erneut versucht.
+Auf der Warenkorbseite wird geprüft, welche Ticket-Einträge gegenüber dem vorherigen Stand hinzugekommen sind. Nur bei einer eindeutigen Bestätigung wird die Teilmenge auf das Suchziel angerechnet. Vorhandene Warenkorbtickets werden nicht als neue Tickets gezählt. Bereits übernommene Sitz-IDs werden bei späteren Angeboten ausgeschlossen. Nach Bestätigung wird nur die Restmenge gesucht. Doppelte Bestätigungen oder ein Neustart des Hintergrundprozesses erhöhen den Zähler nicht erneut.
+
+Bereits vor dem Start im Saalplan ausgewählte Plätze verhindern den automatischen Lauf; sie werden nicht eigenständig entfernt. Die Anzahl bezeichnet die während dieses Suchziels neu hinzuzufügenden Tickets. Ein vorhandener Warenkorb wird nicht geleert. Eine unbestätigte Übergabe wird niemals automatisch wiederholt. Bei unbekanntem Warenkorbformat, unerwarteter Anzahl neuer Einträge oder fehlenden zuvor bestätigten Tickets hält die Suche an. Bitte dann den Warenkorb und die Reservierungsfrist prüfen.
 
 **Stoppen** beendet Überwachung und Automatik. Nach Verarbeitung des Stopps werden keine weiteren Sitze ausgewählt und keine Warenkorbübergabe ausgelöst. Bereits ausgeführte Auswahlschritte bleiben im Shop sichtbar und müssen dort bei Bedarf geprüft oder zurückgesetzt werden. Schließen stoppt ebenfalls den Ablauf.
 
-Die passive Überwachung erzeugt keine zusätzlichen Verfügbarkeitsabfragen. Der automatische Auswahllauf erzeugt die normalen Auswahl- und Warenkorbanfragen des Shops. Die Erweiterung lädt die Seite nicht automatisch neu. Sitzdaten und Änderungsprotokoll bleiben nur im Arbeitsspeicher des Tabs.
+Bereits in den Warenkorb übernommene Tickets bleiben dort. Beim ausdrücklichen Fortsetzen einer gestoppten, eindeutig bestätigten Suche im selben Tab bleibt dieser Fortschritt erhalten. Nach 30 Minuten wird eine laufende Suche angehalten. Ein abgelaufenes oder zwischenzeitlich entferntes, zuvor bestätigtes Ticket wird nicht stillschweigend ersetzt.
+
+Die passive Überwachung erzeugt keine zusätzlichen Verfügbarkeitsabfragen. Die Automatik liest den Warenkorb und erzeugt die normalen Auswahl- und Warenkorbanfragen des Shops. Für die Restmenge wechselt sie zurück zur ursprünglichen Ticketseite und öffnet den Saalplan. Sitzdaten und Änderungsprotokoll bleiben im Tab; Suchziel, bestätigte Warenkorbschlüssel, übernommene Sitzdaten und ausstehende Übergaben liegen zusätzlich in `chrome.storage.session`. Sie überleben Seitenwechsel und einen Neustart des Hintergrundprozesses, nicht einen Browserneustart.
 
 ## Aktualität und Grenzen
 
@@ -55,7 +63,7 @@ Die passive Überwachung erzeugt keine zusätzlichen Verfügbarkeitsabfragen. De
 - Der Shop hat bei der Untersuchung mehrfach selbst als `expired: true` markierte Antworten geliefert. Ein geladener Saalplan allein beweist keinen aktuellen Datenstand.
 - Verfügbarkeit, Mapping-Sperrstatus und Preiskategorie werden geprüft. Buchungsregeln, persönliche Shopfilter und Nutzerberechtigungen können eine Auswahl dennoch verhindern. Zwischen Anzeige und Auswahl kann ein Sitz anderweitig vergeben werden.
 - Der Monitor zeigt Block, Reihe, technische Sitz-ID und Kategorie. Die Sitz-ID ist keine Sitznummer. Ton und Systembenachrichtigungen sind nicht enthalten.
-- Unterstützt wird ausschließlich `/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/<ID>` auf `www.ticket-onlineshop.com`.
+- Unterstützt werden der Hospitality-Saalplan unter `/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/<ID>` und die zugehörige `/shoppingcart`-Seite auf `www.ticket-onlineshop.com`. Die Prüfung des Warenkorbs nutzt die bekannten Ticketkarten und Warenkorbmarkierungen; unbekannte Varianten halten die Suche an.
 
 ## Technik und Datenschutz
 
@@ -71,11 +79,13 @@ Die Dekodierung folgt dem untersuchten Eventim-Saalplan-Client 6.20.0. Ein Sitz 
 
 `page-observer.js` beobachtet ab Dokumentstart `fetch` und `XMLHttpRequest` in der Seitenwelt. Originale Requests und Antworten werden an die Seite weitergereicht. Nur passende Antworten für das aktuelle Event werden zusätzlich gelesen. Die Erweiterung wiederholt keine signierten Requests. Antwortreihenfolge und Datenzeitstempel verhindern, dass verspätete Antworten neuere Daten überschreiben.
 
-`preferences.js` plant eine vollständige Auswahl anhand frischer Daten. `preferences-ui.js` stellt Gruppen, Unterkategorien, Sortierpfeile und Ticketanzahl bereit. `cart-flow.js` verwendet die untersuchten Shop-Funktionen `sms.selectById()` und `seatSelection.getSelectedSeats()`. Es wartet nach jeder Auswahl auf die Sitzkarte, prüft den bekannten Formularpfad des Events und verwendet `#add-to-cart`. Laufkennungen verhindern Wiederholungen desselben Laufs; ein bereits empfangener Stopp verhindert auch einen verspäteten Start.
+`preferences.js` plant eine passende Teilmenge bis zur Restmenge und berücksichtigt bereits gesicherte Sitze. `preferences-ui.js` stellt Gruppen, Unterkategorien, Sortierpfeile und Ticketanzahl bereit. `cart-flow.js` verwendet `sms.selectById()` und `seatSelection.getSelectedSeats()`. Auswahlvorbereitung und Formularübergabe sind getrennt, damit der Hintergrundprozess den ausstehenden Schritt vorher speichern kann. Jede Sitzkarte, der Formularpfad und `#add-to-cart` werden geprüft. Laufkennungen verhindern Wiederholungen; ein bereits empfangener Stopp verhindert auch einen verspäteten Start.
+
+`cart-session.js` verwaltet das Suchziel pro Tab mit serialisierten Zustandsänderungen. `cart-receipt.js` liest Warenkorbkarten; `cart-return.js` meldet den bestätigten Warenkorbstand aus dem isolierten Kontext. Nur eine bestätigte Teilübergabe erlaubt die nächste. Bei unbekanntem Ausgang bleibt die Suche angehalten. Der Hintergrundprozess bestimmt Ziel, Restmenge und Rückkehradresse aus der gespeicherten Sitzung, nicht aus frei übergebenen URLs der Seite.
 
 `monitor.js` läuft als isoliertes Content-Script. Über die Seitenbrücke werden normalisierte Sitzdaten und Statusmeldungen übergeben, keine Cookies, Request-Header, Signaturen oder API-Schlüssel. Warenkorbbefehle gehen über den Service-Worker, der Extension-Absender, Tab, Event-Adresse und Modulversionen prüft. Der MAIN-Controller liest den Datenstand direkt vom Beobachter über `TicketDataObserver.getSnapshot()`; er ist nicht mehr auf eine separat initialisierte Kopie angewiesen. Auch ein erst nach den Netzwerkantworten erzeugter Controller erhält den vollständigen Stand. Vor jedem Auswahlschritt wird er erneut gelesen. Fehlende Daten, zu alte Daten und zu wenige passende Angebote werden mit unterschiedlichen Meldungen erklärt. Seitennachrichten können keine beliebigen IDs oder Browserbefehle einschleusen. Shoptexte werden als Text gerendert.
 
-Die Berechtigungen sind `activeTab`, `scripting` und `storage` sowie die beschränkte Content-Script-Zuordnung zum Shop-Pfad. `storage` speichert ausschließlich Einstellungen. `debugger` und Screenshots werden nicht verwendet. Die frühere Bild- und Klicksteuerung wurde entfernt.
+Die Berechtigungen sind `activeTab`, `scripting` und `storage` sowie die beschränkte Content-Script-Zuordnung zu Saalplan und Warenkorb. `storage.local` speichert Einstellungen und `storage.session` den laufenden Suchfortschritt, keine Cookies, Zugangsdaten oder Signaturen. `debugger` und Screenshots werden nicht verwendet.
 
 ## Entwicklung und Prüfstatus
 
@@ -92,7 +102,9 @@ Die Browserprüfung nutzt `CHROMIUM_PATH`, `/usr/bin/chromium` oder einen instal
 
 `tests/worlds.browser.cjs` ergänzt eine Prüfung mit tatsächlich getrennten Chrome-MAIN- und ISOLATED-Ausführungskontexten. Sie verwendet den tatsächlichen Hintergrund-Handler mit einem kontrollierten Chrome-API-Adapter. Getestet werden ein nach dem Erweiterungsupdate stehengebliebener alter Controller, der ausdrücklich ausgelöste Seitenreload und ein neuer Controller, dessen Beobachter die Netzwerkdaten schon vor seiner Erzeugung empfangen hat. Auch der vollständige Nachrichtenweg von der isolierten Oberfläche über den Hintergrund-Handler zur Platzwahl wird damit geprüft. Die Shop-Seitenauswahl selbst bleibt in diesem Test simuliert.
 
-Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Die Shopfunktionen und der Warenkorb-Formularpfad wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Warenkorbabschluss mit Version 1.1.2 ist daher noch nicht verifiziert.
+`tests/goal.browser.cjs` prüft den vollständigen Ablauf über tatsächliche Formular-POSTs und Browser-Seitenwechsel gegen kontrollierte Shopseiten: nur ein verfügbares Ticket bei Ziel zwei, Warenkorbbestätigung, automatische Rückkehr, späteres zweites Ticket, Ausschluss des erneut angebotenen ersten Sitzes, Abschluss bei 2/2 sowie Stoppen nach dem ersten Ticket. Die Shop-Buchung selbst wird dabei simuliert.
+
+Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Shopfunktionen, Warenkorb-Formularpfad und leerer Warenkorb wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Mehrschritt-Warenkorbabschluss mit Version 1.2.0 ist daher noch nicht verifiziert.
 
 Beim lesenden Abgleich am 8. November 2026 wurden alle neun gelieferten Sitzangebote den vorgesehenen VIP-Unterkategorien zugeordnet. Shop-Schnittstelle und Ticketlimit von sechs waren vorhanden. Die API-Antwort war als abgelaufen markiert; Version 1.1.0 lieferte deshalb keine Auswahl. Version 1.1.1 verwendet solche kürzlich empfangenen Listen als Kandidaten und verlangt danach die Shop-Bestätigung. Der entsprechende Fehlerfall ist mit kontrollierten Shopantworten im Browser abgedeckt.
 

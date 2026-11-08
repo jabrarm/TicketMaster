@@ -77,7 +77,7 @@
       if (touched || !data.ticketPreferencesV1) return;
       try { validate(data.ticketPreferencesV1); config = data.ticketPreferencesV1; changed(copy()); render(); } catch {}
     }).catch(() => {});
-    return { get: copy, lock(value) { locked = value; render(); }, snapshot(value) { snapshot = value; refreshCounts(); } };
+    return { get: copy, set(value) { validate(value); config = JSON.parse(JSON.stringify(value)); touched = true; render(); changed(copy()); }, lock(value) { locked = value; render(); }, snapshot(value) { snapshot = value; refreshCounts(); } };
   };
   globalThis.TicketPreferencePanel = { create };
 })();
