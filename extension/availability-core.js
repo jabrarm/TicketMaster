@@ -1,0 +1,115 @@
+/* The Eventim 6.20 DTO uses delta-encoded IDs. No colors are interpreted. */
+(() => {
+  'use strict';
+  const validId = value => Number.isSafeInteger(value) && value > 0;
+  function fail(message) { throw new Error(message); }
+  function array(value) { if (!Array.isArray(value)) fail('Unbekanntes Datenformat.'); return value; }
+  function deltaRows(rows, columns) {
+    let id = 0, category = 0;
+    return array(rows).map(row => {
+      if (!Array.isArray(row) || row.length < columns || !Number.isSafeInteger(row[0])) fail('Ungültige Sitzdaten.');
+      id += row[0];
+      if (!validId(id)) fail('Ungültige Sitz-ID.');
+      if (columns === 3) {
+        if (!Number.isSafeInteger(row[2])) fail('Ungültige Preiskategorie.');
+        category += row[2];
+      }
+      return { id, value: row[1], category };
+    });
+  }
+  function eventId(url) {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'https:' || u.hostname !== 'www.ticket-onlineshop.com') return null;
+      return u.pathname.match(/^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/areaplan\/venue\/event\/(\d+)\/?$/)?.[1] || null;
+    } catch { return null; }
+  }
+  function endpoint(url, pageUrl) {
+    try {
+      const u = new URL(url, pageUrl), event = eventId(pageUrl);
+      const match = u.pathname.match(/^\/seatmap\/api\/public\/(seatmap|mapping|availability)\/(tixx-\d+-\d+)\/?$/);
+      return u.protocol === 'https:' && u.hostname === 'public-api.eventim.com' && match && event && match[2].endsWith('-' + event)
+        ? { kind: match[1], inventory: match[2] } : null;
+    } catch { return null; }
+  }
+  function geometry(data) {
+    const seats = new Map();
+    const labels = new Map(array(data.labels).filter(x => x.type === 'ROW').map(x => [x.id, String(x.text)]));
+    for (const area of array(data.areas)) for (const block of array(area.blocks)) {
+      for (const row of array(block.rows || [])) for (const group of array(row.seats)) {
+        let id = 0;
+        for (const item of array(group)) {
+          if (!Array.isArray(item) || !Number.isSafeInteger(item[0])) fail('Unbekannte Saalplan-Geometrie.');
+          id += item[0];
+          if (!validId(id) || seats.has(id)) fail('Ungültige oder doppelte Sitz-ID.');
+          seats.set(id, { id, blockId: block.id, block: String(block.name || block.id), row: labels.get(row.id) || '–' });
+        }
+      }
+    }
+    return seats;
+  }
+  class Inventory {
+    constructor() { this.parts = {}; this.identity = null; this.last = null; this.timestamp = -Infinity; }
+    accept(kind, data, identity, now = Date.now()) {
+      if (!['seatmap', 'mapping', 'availability'].includes(kind)) fail('Unbekannte Datenquelle.');
+      if (!data || typeof data !== 'object' || String(data.seatmapId) !== identity.split('-').at(-1)) fail('Saalplan-Zuordnung fehlt.');
+      if (data.seatmapVersion == null) fail('Saalplan-Version fehlt.');
+      if (this.identity !== identity) {
+        this.parts = {}; this.last = null; this.timestamp = -Infinity; this.identity = identity;
+      }
+      if (kind === 'availability') {
+        if (!Number.isFinite(data.timestamp)) fail('Zeitstempel der Verfügbarkeit fehlt.');
+        if (this.parts.availability?.seatmapVersion === data.seatmapVersion && data.timestamp < this.timestamp) return null;
+      }
+      // Construct a candidate before committing, so a failed response cannot replace a valid baseline.
+      const parts = { ...this.parts, [kind]: data };
+      const candidate = parts.seatmap && parts.mapping && parts.availability && (!this.last || kind === 'availability') ? this.build(parts, now) : null;
+      this.parts = parts;
+      if (candidate) { this.last = candidate; this.timestamp = parts.availability.timestamp; }
+      return candidate;
+    }
+    build(parts, now) {
+      const { seatmap, mapping, availability } = parts;
+      const versions = [seatmap, mapping, availability].map(x => String(x.seatmapVersion));
+      if (new Set(versions).size !== 1) return null; // Wait for the matching map/mapping response.
+      const seats = geometry(seatmap);
+      const categories = new Map(array(mapping.priceCategories).map(x => [x.id, String(x.name || x.id)]));
+      const mappings = new Map(deltaRows(mapping.seats, 3).map(x => [x.id, x]));
+      const result = [], seen = new Set();
+      for (const item of deltaRows(availability.seats, 2)) {
+        if (seen.has(item.id) || ![0, 1].includes(item.value)) fail('Unbekannter Sitzstatus.');
+        seen.add(item.id);
+        if (item.value !== 1) continue;
+        const seat = seats.get(item.id), entry = mappings.get(item.id);
+        if (!seat || !entry) fail('Sitzdaten sind unvollständig.');
+        if (![0, 1].includes(entry.value)) fail('Unbekannter Mapping-Sperrstatus.');
+        if (entry.value !== 0) continue; // BLOCKED is 1; only NONE (0) is selectable.
+        if (!categories.has(entry.category)) fail('Preiskategorie fehlt.');
+        result.push({ ...seat, category: categories.get(entry.category) });
+      }
+      const stale = availability.expired === true || (Number.isFinite(availability.expiryTimestamp) && availability.expiryTimestamp < now);
+      return { inventory: this.identity, version: versions[0], timestamp: availability.timestamp, checkedAt: now, stale,
+        validUntil: Number.isFinite(availability.expiryTimestamp) ? availability.expiryTimestamp : null,
+        seats: result.sort((a, b) => a.block.localeCompare(b.block, 'de', { numeric: true }) || a.id - b.id) };
+    }
+  }
+  class Tracker {
+    constructor() { this.reset(); }
+    reset() { this.previous = null; this.scope = null; this.timestamp = -Infinity; }
+    update(snapshot) {
+      if (!snapshot || !Array.isArray(snapshot.seats) || !Number.isFinite(snapshot.timestamp)) fail('Unvollständiger Datenstand.');
+      if (snapshot.stale || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < Date.now())) return null;
+      const scope = snapshot.inventory + ':' + snapshot.version;
+      if (this.scope === scope && snapshot.timestamp < this.timestamp) return null;
+      const current = new Set(snapshot.seats.map(x => x.id));
+      const baseline = !this.previous || this.scope !== scope;
+      const added = baseline ? [] : snapshot.seats.filter(x => !this.previous.has(x.id));
+      const removed = baseline ? [] : [...this.previous].filter(id => !current.has(id));
+      this.previous = current; this.scope = scope; this.timestamp = snapshot.timestamp;
+      return { baseline, added, removed };
+    }
+  }
+  const api = { eventId, endpoint, Inventory, Tracker };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else globalThis.TicketAvailability = api;
+})();

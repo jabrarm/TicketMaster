@@ -1,0 +1,74 @@
+(() => {
+  'use strict';
+  if (window.__ticketDataObserver) return;
+  window.__ticketDataObserver = true;
+  const { endpoint, Inventory } = globalThis.TicketAvailability;
+  const inventory = new Inventory();
+  const channel = 'ticket-data-monitor-v1';
+  let latest = null;
+  let sequence = 0;
+  const handled = new Map();
+  const fresh = target => {
+    const key = target.inventory + ':' + target.kind;
+    if (target.sequence < (handled.get(key) || 0)) return false;
+    handled.set(key, target.sequence); return true;
+  };
+  const send = payload => window.postMessage({ channel, ...payload }, location.origin);
+  const report = message => { latest = { type: 'error', message }; send(latest); };
+  const accept = (target, data) => {
+    if (!fresh(target)) return;
+    try {
+      const snapshot = inventory.accept(target.kind, data, target.inventory);
+      if (snapshot) { latest = { type: 'snapshot', snapshot }; send(latest); }
+      else if (new Set(Object.values(inventory.parts).map(x => String(x.seatmapVersion))).size > 1) report('Saalplan-Versionen passen noch nicht zusammen. Warte auf Shopdaten.');
+    } catch (error) { report(error.message); }
+  };
+  const unchanged = target => {
+    if (target.kind === 'availability' && inventory.parts.availability) accept(target, inventory.parts.availability);
+  };
+  const receive = async (target, response) => {
+    if (response.status === 304) { unchanged(target); return; }
+    if (!response.ok) { if (fresh(target)) report('Shopdaten konnten nicht geladen werden (HTTP ' + response.status + ').'); return; }
+    try {
+      const text = await response.text();
+      if (text.length > 8000000) throw new Error('Saalplan-Daten überschreiten das unterstützte Format.');
+      accept(target, JSON.parse(text));
+    } catch { if (fresh(target)) report('Shopantwort konnte nicht als Sitzdaten gelesen werden.'); }
+  };
+  const originalFetch = window.fetch;
+  window.fetch = function (...args) {
+    const target = endpoint(typeof args[0] === 'string' || args[0] instanceof URL ? String(args[0]) : args[0]?.url, location.href);
+    if (target) target.sequence = ++sequence;
+    const result = Reflect.apply(originalFetch, this, args);
+    if (target) result.then(response => { void receive(target, response.clone()); }, () => { if (fresh(target)) report('Netzwerkfehler beim Laden der Shopdaten.'); });
+    return result;
+  };
+  const originalOpen = XMLHttpRequest.prototype.open, originalSend = XMLHttpRequest.prototype.send;
+  const targets = new WeakMap();
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    const result = Reflect.apply(originalOpen, this, [method, url, ...rest]);
+    targets.set(this, endpoint(String(url), location.href)); return result;
+  };
+  XMLHttpRequest.prototype.send = function (...args) {
+    const target = targets.get(this);
+    if (target) target.sequence = ++sequence;
+    if (target) this.addEventListener('loadend', () => {
+      if (this.status === 304) unchanged(target);
+      else if (this.status < 200 || this.status >= 300) { if (fresh(target)) report('Shopdaten konnten nicht geladen werden (HTTP ' + this.status + ').'); }
+      else {
+        try {
+          const data = this.responseType === 'json' ? this.response : JSON.parse(this.responseText);
+          accept(target, data);
+        } catch { if (fresh(target)) report('Shopantwort konnte nicht als Sitzdaten gelesen werden.'); }
+      }
+    }, { once: true });
+    return Reflect.apply(originalSend, this, args);
+  };
+  window.addEventListener('message', event => {
+    if (event.source !== window || event.origin !== location.origin || event.data?.channel !== channel || event.data.type !== 'request') return;
+    if (latest?.type === 'snapshot') send({ ...latest, snapshot: { ...latest.snapshot,
+      stale: latest.snapshot.stale || (Number.isFinite(latest.snapshot.validUntil) && latest.snapshot.validUntil < Date.now()) } });
+    else if (latest) send(latest);
+    else send({ type: 'waiting', message: 'Warte auf Saalplan-Daten. Öffne „Jetzt Plätze auswählen“. Falls nötig, lade die Ticketseite neu.' });
+  });
+})();
