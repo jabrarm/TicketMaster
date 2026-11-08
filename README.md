@@ -1,16 +1,16 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.1.0
+# TicketMaster · Verfügbarkeit und Warenkorb 1.1.1
 
 Chrome-Erweiterung für den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine vollständig bestätigte Auswahl an den Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
 1. Den Branch `availability-monitor-v1` bzw. das ZIP der aktuellen Version herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.1.0**. Die zusätzliche Berechtigung `storage` speichert die Einstellungen lokal.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.1.1**. Die zusätzliche Berechtigung `storage` speichert die Einstellungen lokal.
 3. Die [Ticketseite](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) nach Installation oder Update neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen.
 4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
 6. Für die Automatik **Anzahl Tickets** von 1 bis 6 einstellen. Kategorien über die Gruppen-Häkchen komplett auswählen, Unterkategorien bei Bedarf abwählen und Gruppen sowie Unterkategorien mit **↑ / ↓** sortieren. Oben steht die höchste Präferenz. Über das Dreieck lassen sich Unterkategorien ein- und ausklappen.
-7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik wartet auf genügend passende, aktuelle Plätze.
+7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
 
 Fehlende Seitenskripte werden beim Klick auf das Erweiterungssymbol nachgeladen, damit sich das Fenster auch in bereits geöffneten Tabs öffnet. Zum Erfassen aller Saalplan-Daten die Ticketseite dennoch nach Installation oder Update neu laden. Nicht unterstützte Seiten erhalten einen Hinweis. Verweigert Chrome die Skriptausführung, erscheint am Erweiterungssymbol ein rotes `!`; der Hinweis beim Darüberfahren nennt den Fehler.
 
@@ -48,7 +48,8 @@ Die passive Überwachung erzeugt keine zusätzlichen Verfügbarkeitsabfragen. De
 
 - Der erste gültige Datenstand ist für die Änderungsanzeige der Ausgangsbestand und erzeugt keine Neu-verfügbar-Meldung. Ein ausdrücklich gestarteter Warenkorblauf darf auch bereits im Ausgangsbestand freie Sitze wählen.
 - Der untersuchte Shop-Adapter ruft alle 20 Sekunden die Aktualisierungsfunktion des Saalplan-Clients auf. Neue Netzwerkdaten hängen zusätzlich vom Client und den API-Antworten ab. Hintergrund-Tabs können gedrosselt werden. Ein WebSocket-Livestream wurde nicht bestätigt.
-- Abgelaufene oder über zwei Minuten alte Daten lösen keine automatische Auswahl aus. Fehler werden nicht als ausverkaufter Bestand behandelt. Ein gültiger Stand wird bei Fehlern mit einem Hinweis weiter angezeigt.
+- Version 1.1.1 behebt das endlose Warten trotz angezeigter Angebote: Eine innerhalb der letzten zwei Minuten empfangene Antwort darf auch bei `expired: true` unverbindliche Kandidaten für die Platzwahl liefern. Jeder Sitz muss danach vom normalen Auswahlablauf des Shops mit einer Sitzkarte bestätigt werden. Ohne die vollständige Bestätigung erfolgt kein Warenkorbklick. Für Neu-verfügbar-Meldungen bleibt die Cache-Ablaufprüfung unverändert streng.
+- Liegt der letzte bestätigte Empfang mehr als zwei Minuten zurück oder enthält die Antwort Fehler bzw. unbekannte Daten, startet keine Auswahl. Die Automatik nennt den Wartegrund. Fehler werden nicht als ausverkaufter Bestand behandelt.
 - Der Shop hat bei der Untersuchung mehrfach selbst als `expired: true` markierte Antworten geliefert. Ein geladener Saalplan allein beweist keinen aktuellen Datenstand.
 - Verfügbarkeit, Mapping-Sperrstatus und Preiskategorie werden geprüft. Buchungsregeln, persönliche Shopfilter und Nutzerberechtigungen können eine Auswahl dennoch verhindern. Zwischen Anzeige und Auswahl kann ein Sitz anderweitig vergeben werden.
 - Der Monitor zeigt Block, Reihe, technische Sitz-ID und Kategorie. Die Sitz-ID ist keine Sitznummer. Ton und Systembenachrichtigungen sind nicht enthalten.
@@ -87,8 +88,8 @@ npm run test:browser
 
 Die Browserprüfung nutzt `CHROMIUM_PATH`, `/usr/bin/chromium` oder einen installierten Playwright-Browser. Die Tests prüfen Dekodierung, Baseline, Versionswechsel, abgelaufene Daten, Fetch/XHR, Kategoriezuordnung, Sortierung, Nebeneinander-Präferenz, exakte Ticketanzahl, einzelne Shop-Bestätigungen, einmaligen Warenkorbklick und Stoppen mit kontrollierten Shopantworten. Der automatisierte Gesamttest ersetzt die Shopfunktionen und die Extension-Nachrichtenbrücke durch kontrollierte Testgegenstücke.
 
-Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Die Shopfunktionen und der Warenkorb-Formularpfad wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Warenkorbabschluss mit Version 1.1.0 ist daher noch nicht verifiziert.
+Am 6. November 2026 stimmten am echten Event `674379` alle 17 dekodierten Sitz-IDs mit den vom Shop-Client als verfügbar erkannten Sitz-IDs überein. Das ist eine Momentaufnahme und keine Reservierungsbestätigung. Die Shopfunktionen und der Warenkorb-Formularpfad wurden lesend untersucht. Es wurden keine echten Plätze ausgewählt oder reserviert; ein echter Warenkorbabschluss mit Version 1.1.1 ist daher noch nicht verifiziert.
 
-Beim lesenden Abgleich am 8. November 2026 wurden alle neun gelieferten Sitzangebote den vorgesehenen VIP-Unterkategorien zugeordnet. Shop-Schnittstelle und Ticketlimit von sechs waren vorhanden. Die API-Antwort war als abgelaufen markiert; die Planung lieferte deshalb keine Auswahl. Der bestehende Auswahlstand blieb bei null.
+Beim lesenden Abgleich am 8. November 2026 wurden alle neun gelieferten Sitzangebote den vorgesehenen VIP-Unterkategorien zugeordnet. Shop-Schnittstelle und Ticketlimit von sechs waren vorhanden. Die API-Antwort war als abgelaufen markiert; Version 1.1.0 lieferte deshalb keine Auswahl. Version 1.1.1 verwendet solche kürzlich empfangenen Listen als Kandidaten und verlangt danach die Shop-Bestätigung. Der entsprechende Fehlerfall ist mit kontrollierten Shopantworten im Browser abgedeckt.
 
 Das tatsächliche Laden einer entpackten Erweiterung ist in der Cloud durch eine Chromium-Administrationsrichtlinie blockiert. Die lokalen Browserprüfungen injizieren die Skripte deshalb zur Laufzeit. Installation und Betrieb in normalem Chrome bleiben Teil des manuellen Tests.

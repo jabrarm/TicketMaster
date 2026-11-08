@@ -16,7 +16,7 @@ function setup(options = {}) {
     form: () => ({}), validForm: () => !options.invalidForm, button: () => ({ click: () => { clicks++; } }),
     cardReady: () => !options.unconfirmed, buttonReady: () => !options.disabled
   });
-  controller.updateSnapshot({ inventory: 'tixx-1001-674379', checkedAt: time, stale: false, seats: [1, 2].map(id => ({ id, category: 'PK8 VIP-Rang Platin', block: 'N1', row: '20' })) });
+  controller.updateSnapshot({ inventory: 'tixx-1001-674379', checkedAt: options.old ? time - 120001 : time, stale: Boolean(options.expired), validUntil: options.expired ? time - 1000 : null, seats: [1, 2].map(id => ({ id, category: 'PK8 VIP-Rang Platin', block: 'N1', row: '20' })) });
   return { controller, calls, chosen, clicks: () => clicks, config: { ...preferences.defaults(), quantity: 2 } };
 }
 test('selects the exact requested IDs one at a time and clicks cart once only after confirmation', async () => {
@@ -43,4 +43,15 @@ test('stop before execution and stop during selection both prevent subsequent ac
   await assert.rejects(early.controller.start(early.config, 'run-test-01'), /gestoppt/); assert.equal(early.calls.length, 0);
   const during = setup({ cancel: true }); await assert.rejects(during.controller.start(during.config, 'run-test-01'), /gestoppt/);
   assert.equal(during.calls.length, 1); assert.equal(during.clicks(), 0);
+});
+test('expired cache candidates still require full shop confirmation, and old HTTP snapshots remain blocked', async () => {
+  const confirmed = setup({ expired: true });
+  assert.equal((await confirmed.controller.start(confirmed.config, 'run-test-01')).stage, 'submitted');
+  assert.equal(confirmed.clicks(), 1);
+  const rejected = setup({ expired: true, unconfirmed: true });
+  await assert.rejects(rejected.controller.start(rejected.config, 'run-test-01'));
+  assert.equal(rejected.clicks(), 0);
+  const old = setup({ expired: true, old: true });
+  await assert.rejects(old.controller.start(old.config, 'run-test-01'));
+  assert.equal(old.calls.length, 0); assert.equal(old.clicks(), 0);
 });

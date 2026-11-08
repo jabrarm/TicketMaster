@@ -21,7 +21,7 @@
         if (cancelled.has(runId)) throw new Error('Diese Automatik-Sitzung wurde bereits gestoppt.');
         if (active || used.has(runId)) throw new Error('Ein Warenkorblauf ist bereits aktiv oder wurde schon ausgeführt.');
         const prefs = env.preferences(); prefs.validate(config);
-        const plan = prefs.plan(snapshot, config, now());
+        const plan = prefs.candidates(snapshot, config, now());
         if (!plan) throw new Error('Noch nicht genügend aktuelle, passende Plätze verfügbar.');
         if (!env.eventId() || !snapshot.inventory.endsWith('-' + env.eventId())) throw new Error('Die Ticketseite hat gewechselt.');
         const client = env.client(), selection = env.selection();
@@ -36,7 +36,7 @@
         try {
           for (const seat of plan.seats) {
             check(run);
-            if (!prefs.plan({ ...snapshot, seats: snapshot.seats.filter(s => s.id === seat.id) }, { ...config, quantity: 1 }, now())) throw new Error('Verfügbarkeit ist inzwischen abgelaufen oder der Platz nicht mehr frei. Bereits ausgewählte Plätze bitte im Shop prüfen.');
+            if (!prefs.candidates({ ...snapshot, seats: snapshot.seats.filter(s => s.id === seat.id) }, { ...config, quantity: 1 }, now())) throw new Error('Der empfangene Stand ist zu alt oder der Platz wird nicht mehr angeboten. Bereits ausgewählte Plätze bitte im Shop prüfen.');
             const expected = [...run.selected, 's' + seat.id];
             if (!exact(ids(selection.getSelectedSeats()), run.selected)) throw new Error('Die Platzauswahl wurde zwischenzeitlich verändert. Automatik angehalten.');
             client.selectById('s' + seat.id);

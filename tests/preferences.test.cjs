@@ -44,3 +44,11 @@ test('invalid counts, duplicate groups and unknown children are rejected', () =>
   const config = prefs.defaults(); config.groups[1] = config.groups[0];
   assert.throws(() => prefs.validate(config));
 });
+test('recently received expired cache entries are tentative cart candidates, never fresh availability notifications', () => {
+  const current = { ...snapshot([seat(1)]), stale: true, validUntil: Date.now() - 1000 };
+  const config = prefs.defaults();
+  assert.equal(prefs.plan(current, config), null);
+  assert.equal(prefs.candidates(current, config).seats[0].id, 1);
+  assert.equal(prefs.candidates({ ...current, checkedAt: Date.now() - 120001 }, config), null);
+  assert.equal(prefs.candidates({ ...current, checkedAt: NaN }, config), null);
+});

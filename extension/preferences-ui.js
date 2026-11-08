@@ -67,7 +67,8 @@
       for (const group of config.groups) {
         const count = group.children.filter(c => c.enabled).reduce((n, c) => n + (counts.get(c.id) || 0), 0);
         const el = container.querySelector('[data-group-count="' + group.id + '"]');
-        if (el) el.textContent = count + ' aktuell gemeldete Sitze in gewählten Unterkategorien';
+        const expired = snapshot.stale || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < Date.now());
+        if (el) el.textContent = count + (expired ? ' Sitzangebote aus der Shop-Liste; Bestätigung bei Platzwahl erforderlich' : ' aktuell gemeldete Sitze in gewählten Unterkategorien');
       }
       container.querySelector('[data-unmatched]').textContent = (unknown ? unknown + ' Sitze lassen sich keiner Unterkategorie eindeutig zuordnen und werden nicht automatisch gewählt. ' : '') + 'Die Hospitality-Seite liefert VIP-Angebote. Kategorien ohne passende Shopdaten bleiben für die Automatik unberücksichtigt.';
     }

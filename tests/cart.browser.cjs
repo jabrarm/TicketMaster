@@ -4,12 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
 const scripts = ['availability-core.js', 'preferences.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
-async function setup(browser, delay = 0) {
+async function setup(browser, delay = 0, expired = false) {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   const data = fixture();
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   data.availability.seats = [[1001, 1], [1, 1], [999, 0], [1000, 1]];
+  data.availability.expired = expired;
+  if (expired) data.availability.expiryTimestamp = Date.now() - 1000;
   const html = `<!doctype html><title>Controlled ticket shop</title><h1>Test-Saalplan</h1>
     <form id="seatCardForm" method="post" action="/ols/werderbremen-hospitality/de/tageskarte/channel/shop/shoppingcart/addselecteditemsareas/event/674379">
     <ul id="seat-cards-list"></ul><button id="add-to-cart" type="submit">In den Warenkorb</button></form>
@@ -74,5 +76,16 @@ async function setup(browser, delay = 0) {
     assert.deepEqual(pending.errors, []);
     console.log('PASS: stop during an unconfirmed selection prevents the next seat and any cart submission');
     await pending.page.close();
+
+    const cached = await setup(browser, 0, true);
+    await cached.panel.getByRole('button', { name: 'Automatisch in den Warenkorb', exact: true }).click();
+    await cached.page.waitForFunction(() => window.cartCalls === 1);
+    assert.deepEqual(await cached.page.evaluate(() => window.cart), ['s1001']);
+    assert.equal(await cached.page.evaluate(() => window.commands.filter(c => c.type === 'cartStart').length), 1);
+    assert.match(await cached.panel.locator('#count-label').textContent(), /Sitzangebote/);
+    assert.match(await cached.panel.locator('#cart-status').textContent(), /1 bestätigte Plätze/);
+    assert.deepEqual(cached.errors, []);
+    console.log('PASS: screenshot regression — an armed run with visible expired-cache offers starts selection and submits only after the shop seat card is confirmed');
+    await cached.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -50,9 +50,10 @@
     validate(config);
     return new Map(config.groups.flatMap(g => g.children.filter(c => c.enabled).map(c => c.id)).map((id, index) => [id, index]));
   }
-  function plan(snapshot, config, now = Date.now()) {
+  function plan(snapshot, config, now = Date.now(), cacheCandidates = false) {
     const ranks = rank(config);
-    if (!snapshot || snapshot.stale || now - snapshot.checkedAt > 120000 || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < now)) return null;
+    if (!snapshot || !Number.isFinite(snapshot.checkedAt) || snapshot.checkedAt > now + 1000 || now - snapshot.checkedAt > 120000) return null;
+    if (!cacheCandidates && (snapshot.stale || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < now))) return null;
     const seats = snapshot.seats.map(s => ({ ...s, preference: match(s) })).filter(s => ranks.has(s.preference));
     const compare = (a, b) => ranks.get(a.preference) - ranks.get(b.preference) || a.id - b.id;
     seats.sort(compare);
@@ -83,7 +84,10 @@
     }
     return { seats: seats.slice(0, config.quantity), adjacent: config.quantity === 1 };
   }
-  const api = { catalog, allIds, defaults, validate, match, rank, plan };
+  // Expired API cache entries are candidate offers, never confirmed tickets.
+  // Only the cart controller may use them, and must require each shop seat card.
+  const candidates = (snapshot, config, now = Date.now()) => plan(snapshot, config, now, true);
+  const api = { catalog, allIds, defaults, validate, match, rank, plan, candidates };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

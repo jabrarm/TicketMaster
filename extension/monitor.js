@@ -26,7 +26,7 @@
       <div class="controls"><button id="start" class="primary">Überwachung starten</button><button id="stop" disabled>Stoppen</button></div>
       <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p>
       <div id="preferences"></div><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
-      <div><span id="count" class="count">–</span> gemeldete freie Sitze</div>
+      <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
       <label>Block <select id="block" aria-label="Block filtern"><option value="">Alle Blöcke</option></select></label>
       <table><thead><tr><th>Block / Reihe</th><th>Sitz-ID</th><th>Kategorie</th></tr></thead><tbody id="seats"></tbody></table>
       <h2>Änderungen seit dem Start</h2><ul id="changes"></ul>
@@ -66,11 +66,17 @@
     render();
   }
   async function maybeCart() {
-    if (!armed || inFlight || !last || error || !running) return;
-    const plan = globalThis.TicketPreferences.plan(last, config);
-    if (!plan) return;
+    if (!armed || inFlight || !running) return;
+    if (!last || error) { cartMessage = error ? 'Automatik wartet: ' + error : 'Automatik wartet auf die Sitzangebote des Shops.'; render(); return; }
+    const plan = globalThis.TicketPreferences.candidates(last, config);
+    if (!plan) {
+      const tooOld = Date.now() - last.checkedAt > 120000;
+      cartMessage = tooOld ? 'Automatik wartet: Seit über zwei Minuten keine Shopantwort. Bitte den Saalplan neu laden.' : 'Automatik wartet: Nicht genügend Sitzangebote für ' + config.quantity + ' Tickets in deinen gewählten Unterkategorien.';
+      render(); return;
+    }
     const currentRun = runId;
-    inFlight = true; cartMessage = 'Wähle ' + config.quantity + ' Plätze ' + (plan.adjacent ? 'nebeneinander nach Saalplan' : 'nach Kategoriepräferenz, einzeln verteilt') + ' und warte auf die Shop-Bestätigung …'; render();
+    const placement = config.quantity === 1 ? 'nach Kategoriepräferenz' : plan.adjacent ? 'nebeneinander nach Saalplan' : 'nach Kategoriepräferenz, einzeln verteilt';
+    inFlight = true; cartMessage = 'Prüfe ' + config.quantity + (config.quantity === 1 ? ' Sitzangebot ' : ' Sitzangebote ') + placement + ' durch die Platzwahl im Shop. Warenkorbübergabe erst nach Bestätigung …'; render();
     try {
       const result = await chrome.runtime.sendMessage({ type: 'cartStart', run: currentRun, config });
       if (result?.stage !== 'submitted') throw new Error(result?.error || 'Die Übergabe wurde nicht bestätigt. Bitte Auswahl und Warenkorb im Shop prüfen.');
@@ -90,13 +96,14 @@
     status.classList.toggle('error', Boolean(error || stale || expired));
     status.textContent = !eventId(location.href) ? 'Diese Adresse wird noch nicht unterstützt. Öffne den Saalplan im Werder-Hospitality-Shop; die Adresse muss mit /areaplan/venue/event/<ID> enden.'
       : !running ? 'Gestoppt. Mit „Überwachung starten“ einen neuen Ausgangsbestand erfassen.'
-      : error || (expired ? 'Die Shopdaten sind abgelaufen. Keine Meldung neuer Verfügbarkeit; warte auf aktuelle Shopdaten.'
+      : error || (expired ? 'Die Shop-Liste ist als abgelaufen markiert. Angezeigte Sitze sind unverbindliche Angebote; die Automatik lässt jeden Sitz durch den Shop bestätigen.'
         : stale ? 'Seit über zwei Minuten keine bestätigte Aktualisierung. Der angezeigte Stand kann veraltet sein.'
         : !last ? 'Warte auf Shopdaten. Öffne den Saalplan; falls nötig, lade die Ticketseite neu.'
           : change?.baseline ? 'Ausgangsbestand erfasst. Warte auf die nächste Aktualisierung des Shops.'
             : `Shopdaten aktualisiert · ${change?.added.length || 0} neu frei · ${change?.removed.length || 0} nicht mehr frei.`);
     ui.querySelector('#checked').textContent = last ? 'Letzter bestätigter Datenempfang: ' + clock(last.checkedAt) : 'Noch kein bestätigter Datenstand.';
     ui.querySelector('#count').textContent = last ? String(last.seats.length) : '–';
+    ui.querySelector('#count-label').textContent = expired || stale ? 'Sitzangebote aus der zuletzt empfangenen Shop-Liste' : 'gemeldete freie Sitze';
     const filter = ui.querySelector('#block'), selected = filter.value;
     filter.replaceChildren(); const all = text('option', 'Alle Blöcke', filter); all.value = '';
     const blocks = new Map((last?.seats || []).map(x => [String(x.blockId), x.block]));
@@ -118,7 +125,7 @@
   window.addEventListener('message', event => {
     if (!running || event.source !== window || event.origin !== location.origin || event.data?.channel !== channel) return;
     const data = event.data;
-    if (data.type === 'error' || data.type === 'waiting') { error = String(data.message).slice(0, 300); render(); return; }
+    if (data.type === 'error' || data.type === 'waiting') { error = String(data.message).slice(0, 300); render(); void maybeCart(); return; }
     if (data.type !== 'snapshot') return;
     const s = data.snapshot;
     // The page bridge never authorizes extension API calls or ticket actions.
@@ -127,7 +134,7 @@
         s.seats.some(x => !x || !Number.isSafeInteger(x.id) || typeof x.block !== 'string' || typeof x.row !== 'string' || typeof x.category !== 'string')) return;
     try {
       const next = tracker.update(s);
-      if (s.stale || (Number.isFinite(s.validUntil) && s.validUntil < Date.now())) { last = s; change = null; error = ''; render(); return; }
+      if (s.stale || (Number.isFinite(s.validUntil) && s.validUntil < Date.now())) { last = s; change = null; error = ''; render(); void maybeCart(); return; }
       if (!next) return;
       last = s; change = next; error = '';
       if (next.baseline) changes = [];
