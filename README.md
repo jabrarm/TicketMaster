@@ -1,4 +1,4 @@
-# TicketMaster · Verfügbarkeitsmonitor 1.0
+# TicketMaster · Verfügbarkeitsmonitor 1.0.1
 
 Chrome-Erweiterung für den Werder-Hospitality-Shop. Sie liest strukturierte Sitzdaten, die der geöffnete Shop selbst lädt. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
@@ -9,6 +9,8 @@ Chrome-Erweiterung für den Werder-Hospitality-Shop. Sie liest strukturierte Sit
 3. Die [Ticketseite](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) öffnen und **nach Installation oder Update neu laden**. Eine Warteschlange normal durchlaufen.
 4. Im Shop **Jetzt Plätze auswählen** öffnen. Die Seite muss ihren Saalplan laden können.
 5. Auf das Erweiterungssymbol klicken und **Überwachung starten** wählen.
+
+Version 1.0.1 lädt beim Klick auf das Erweiterungssymbol fehlende Seitenskripte nach. Dadurch öffnet sich das Fenster auch in einem Tab, der bereits vor der Installation geöffnet war. Zum Erfassen aller Saalplan-Daten die Ticketseite dennoch nach Installation oder Update neu laden. Nicht unterstützte Seiten erhalten einen Hinweis im Fenster. Verweigert Chrome die Skriptausführung, erscheint am Erweiterungssymbol ein rotes `!`; der Hinweis beim Darüberfahren nennt den Fehler.
 
 Der Monitor zeigt die vom Shop gemeldeten freien Sitze mit Block, Reihe, technischer Sitz-ID und Kategorie. Die Sitz-ID ist **keine Sitznummer**. Über den Blockfilter lässt sich die Anzeige eingrenzen. Allgemeine Einlass-/Stehplatzkontingente sind in dieser Version nicht enthalten.
 

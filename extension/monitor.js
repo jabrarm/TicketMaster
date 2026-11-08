@@ -1,7 +1,6 @@
 (() => {
   'use strict';
   if (window.__ticketDataMonitor) return;
-  window.__ticketDataMonitor = true;
   const channel = 'ticket-data-monitor-v1', { Tracker, eventId } = globalThis.TicketAvailability;
   const tracker = new Tracker();
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
@@ -44,12 +43,13 @@
   function stop() { running = false; render(); }
   function render() {
     if (!ui || !host.isConnected) return;
-    ui.querySelector('#start').disabled = running; ui.querySelector('#stop').disabled = !running;
+    ui.querySelector('#start').disabled = running || !eventId(location.href); ui.querySelector('#stop').disabled = !running;
     const status = ui.querySelector('#status');
     const stale = last && Date.now() - last.checkedAt > 120000;
     const expired = last?.stale || (last && Number.isFinite(last.validUntil) && last.validUntil < Date.now());
     status.classList.toggle('error', Boolean(error || stale || expired));
-    status.textContent = !running ? 'Gestoppt. Mit „Überwachung starten“ einen neuen Ausgangsbestand erfassen.'
+    status.textContent = !eventId(location.href) ? 'Diese Adresse wird noch nicht unterstützt. Öffne den Saalplan im Werder-Hospitality-Shop; die Adresse muss mit /areaplan/venue/event/<ID> enden.'
+      : !running ? 'Gestoppt. Mit „Überwachung starten“ einen neuen Ausgangsbestand erfassen.'
       : error || (expired ? 'Die Shopdaten sind abgelaufen. Keine Meldung neuer Verfügbarkeit; warte auf aktuelle Shopdaten.'
         : stale ? 'Seit über zwei Minuten keine bestätigte Aktualisierung. Der angezeigte Stand kann veraltet sein.'
         : !last ? 'Warte auf Shopdaten. Öffne den Saalplan; falls nötig, lade die Ticketseite neu.'
@@ -100,4 +100,5 @@
     if (host?.isConnected) { stop(); host.remove(); } else mount();
   });
   setInterval(() => { if (running) render(); }, 15000);
+  window.__ticketDataMonitor = true;
 })();

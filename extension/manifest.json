@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Verfügbarkeitsmonitor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zeigt freie Sitze und Änderungen anhand der vom Hospitality-Shop geladenen Sitzdaten.",
   "permissions": [
     "activeTab",

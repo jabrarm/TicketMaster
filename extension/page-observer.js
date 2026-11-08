@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   if (window.__ticketDataObserver) return;
+  if (!globalThis.TicketAvailability.eventId(location.href)) return;
   window.__ticketDataObserver = true;
   const { endpoint, Inventory } = globalThis.TicketAvailability;
   const inventory = new Inventory();

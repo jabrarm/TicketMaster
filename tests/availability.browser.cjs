@@ -104,5 +104,33 @@ const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
     await panel.getByRole('button', { name: 'Schließen' }).click();
     assert.equal(await page.locator('#ticket-data-monitor').count(), 0);
     console.log('PASS: labels render as text; foreign-event and malformed messages are ignored; closing removes the monitor');
+
+    const late = await browser.newPage();
+    await late.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Already open ticket page</title><h1>Shop</h1>' }));
+    await late.goto(pageUrl);
+    await late.evaluate(() => window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle')));
+    assert.equal(await late.locator('#ticket-data-monitor').count(), 0, 'reproduces the old silent click before script installation');
+    const inject = async () => {
+      for (const name of ['availability-core.js', 'page-observer.js', 'availability-core.js', 'monitor.js']) {
+        await late.addScriptTag({ content: fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8') });
+      }
+      await late.evaluate(() => window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle')));
+    };
+    await inject();
+    assert.equal(await late.locator('#ticket-data-monitor').count(), 1);
+    await inject();
+    assert.equal(await late.locator('#ticket-data-monitor').count(), 0, 'one click closes rather than double-toggling');
+    await inject();
+    assert.equal(await late.locator('#ticket-data-monitor').count(), 1);
+    await late.locator('#ticket-data-monitor').getByRole('button', { name: 'Überwachung starten' }).click();
+    await late.waitForFunction(() => document.querySelector('#ticket-data-monitor').shadowRoot.querySelector('#status').textContent.includes('Warte auf'));
+    console.log('PASS: toolbar-style late injection opens the monitor in an already loaded tab; repeated injection remains idempotent');
+    await late.goto('https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/');
+    await inject();
+    const unsupported = late.locator('#ticket-data-monitor');
+    assert.match(await unsupported.locator('#status').textContent(), /nicht unterstützt/);
+    assert.equal(await unsupported.locator('#start').isDisabled(), true);
+    console.log('PASS: unsupported shop pages show a visible explanation instead of silently waiting for data');
+    await late.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
