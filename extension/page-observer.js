@@ -20,7 +20,7 @@
     if (!fresh(target)) return;
     try {
       const snapshot = inventory.accept(target.kind, data, target.inventory);
-      if (snapshot) { latest = { type: 'snapshot', snapshot }; send(latest); }
+      if (snapshot) { globalThis.TicketCartFlow?.updateSnapshot(snapshot); latest = { type: 'snapshot', snapshot }; send(latest); }
       else if (new Set(Object.values(inventory.parts).map(x => String(x.seatmapVersion))).size > 1) report('Saalplan-Versionen passen noch nicht zusammen. Warte auf Shopdaten.');
     } catch (error) { report(error.message); }
   };

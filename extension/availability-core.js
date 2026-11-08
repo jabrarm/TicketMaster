@@ -36,14 +36,21 @@
     const seats = new Map();
     const labels = new Map(array(data.labels).filter(x => x.type === 'ROW').map(x => [x.id, String(x.text)]));
     for (const area of array(data.areas)) for (const block of array(area.blocks)) {
-      for (const row of array(block.rows || [])) for (const group of array(row.seats)) {
-        let id = 0;
-        for (const item of array(group)) {
+      for (const row of array(block.rows || [])) for (const [groupIndex, group] of array(row.seats).entries()) {
+        let id = 0, x = 0, y = 0;
+        const members = [], distances = [];
+        for (const [order, item] of array(group).entries()) {
           if (!Array.isArray(item) || !Number.isSafeInteger(item[0])) fail('Unbekannte Saalplan-Geometrie.');
           id += item[0];
+          x += item[1]; y += item[2];
           if (!validId(id) || seats.has(id)) fail('Ungültige oder doppelte Sitz-ID.');
-          seats.set(id, { id, blockId: block.id, block: String(block.name || block.id), row: labels.get(row.id) || '–' });
+          const seat = { id, blockId: block.id, block: String(block.name || block.id), blockDescription: String(block.description || ''), row: labels.get(row.id) || '–', group: [area.id, block.id, row.id, groupIndex].join(':'), order, x, y };
+          if (members.length) distances.push(Math.hypot(x - members.at(-1).x, y - members.at(-1).y));
+          members.push(seat); seats.set(id, seat);
         }
+        distances.sort((a, b) => a - b);
+        const spacing = distances.length ? distances[Math.floor((distances.length - 1) / 2)] : null;
+        for (const seat of members) seat.spacing = spacing;
       }
     }
     return seats;
@@ -85,7 +92,7 @@
         if (![0, 1].includes(entry.value)) fail('Unbekannter Mapping-Sperrstatus.');
         if (entry.value !== 0) continue; // BLOCKED is 1; only NONE (0) is selectable.
         if (!categories.has(entry.category)) fail('Preiskategorie fehlt.');
-        result.push({ ...seat, category: categories.get(entry.category) });
+        result.push({ ...seat, category: categories.get(entry.category), categoryId: entry.category });
       }
       const stale = availability.expired === true || (Number.isFinite(availability.expiryTimestamp) && availability.expiryTimestamp < now);
       return { inventory: this.identity, version: versions[0], timestamp: availability.timestamp, checkedAt: now, stale,

@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Verfügbarkeitsmonitor",
-  "version": "1.0.1",
-  "description": "Zeigt freie Sitze und Änderungen anhand der vom Hospitality-Shop geladenen Sitzdaten.",
+  "version": "1.1.0",
+  "description": "Wählt Sitzplätze nach Ticketanzahl und Kategoriepräferenzen und übergibt bestätigte Plätze an den Warenkorb des Hospitality-Shops.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "background": {
     "service_worker": "background.js"
@@ -16,13 +17,13 @@
   "content_scripts": [
     {
       "matches": ["https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/*"],
-      "js": ["availability-core.js", "page-observer.js"],
+      "js": ["availability-core.js", "preferences.js", "cart-flow.js", "page-observer.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
       "matches": ["https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/*"],
-      "js": ["availability-core.js", "monitor.js"],
+      "js": ["availability-core.js", "preferences.js", "preferences-ui.js", "monitor.js"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }
