@@ -6,6 +6,8 @@
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
   let preferences, config = globalThis.TicketPreferences.defaults(), armed = false, inFlight = false, runId = null, cartMessage = '', submitted = false;
   let goal = null, actionEpoch = 0;
+  let refreshMessage = '', refreshRevision = 0;
+  const refreshCommand = () => ({ documentToken: performance.timeOrigin, revision: refreshRevision = Math.max(refreshRevision + 1, performance.now()) });
   const text = (tag, value, parent) => {
     const node = document.createElement(tag); node.textContent = value; parent?.append(node); return node;
   };
@@ -25,7 +27,7 @@
       fieldset{border:1px solid #395346;border-radius:10px;margin:14px 0;padding:12px}legend{font-weight:650}input[type=number]{width:65px;padding:6px;background:#203d30;color:inherit;border:1px solid #638472;border-radius:6px}input[type=checkbox]{accent-color:#b5e5ba}.checkline{display:flex;align-items:center;gap:8px;margin:7px 0;flex:1}.prefgroup{border-top:1px solid #395346;padding:8px 0}.prefgroup summary{display:flex;gap:4px;align-items:center;cursor:pointer}.prefgroup summary::before{content:'▸'}.prefgroup[open]>summary::before{content:'▾'}.prefchild{display:flex;gap:4px;align-items:center;padding-left:14px;font-size:12px}.order{padding:3px 7px}summary:focus-visible{outline:2px solid #b5e5ba}#cart-status{padding:10px;border:1px solid #638472;border-radius:8px}
     </style><section aria-label="Ticket-Verfügbarkeit"><header><div><h1>Ticket-Verfügbarkeit</h1><span class="muted">Shopdaten · ohne Farberkennung</span></div><button class="close" aria-label="Schließen">×</button></header><main>
       <div class="controls"><button id="start" class="primary">Überwachung starten</button><button id="stop" disabled>Stoppen</button></div>
-      <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p>
+      <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p><p id="refresh-status" class="muted" role="status"></p>
       <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
       <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
       <label>Block <select id="block" aria-label="Block filtern"><option value="">Alle Blöcke</option></select></label>
@@ -38,7 +40,11 @@
     ui.querySelector('#start').onclick = start;
     ui.querySelector('#stop').onclick = stop;
     ui.querySelector('#block').onchange = render;
-    preferences = globalThis.TicketPreferencePanel.create(ui.querySelector('#preferences'), value => { config = value; render(); });
+    preferences = globalThis.TicketPreferencePanel.create(ui.querySelector('#preferences'), value => {
+      const interval = config.refreshSeconds ?? 20; config = value;
+      if (running && interval !== (config.refreshSeconds ?? 20)) updateRefresh();
+      render();
+    });
     config = preferences.get();
     preferences.lock(armed || inFlight);
     ui.querySelector('#auto').onclick = async () => {
@@ -65,10 +71,19 @@
   function start() {
     tracker.reset(); last = null; change = null; error = ''; changes = []; running = true;
     render(); window.postMessage({ channel, type: 'request' }, location.origin);
+    updateRefresh();
+  }
+  function updateRefresh() {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+    void chrome.runtime.sendMessage({ type: 'refreshStart', seconds: config.refreshSeconds ?? 20, ...refreshCommand() }).then(result => {
+      if (result?.error) { refreshMessage = 'Aktualisierung konnte nicht gestartet werden: ' + result.error; render(); }
+    }).catch(e => { refreshMessage = 'Aktualisierung nicht bestätigt: ' + e.message; render(); });
   }
   function stop() {
     actionEpoch++;
     running = false; armed = false;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) void chrome.runtime.sendMessage({ type: 'refreshStop', ...refreshCommand() }).catch(() => {});
+    refreshMessage = 'Zusätzliche Aktualisierung gestoppt. Der normale Shop-Takt bleibt bestehen.';
     if (goal && typeof chrome !== 'undefined') {
       void chrome.runtime.sendMessage({ type: 'goalStop', goalId: goal.id }).then(result => { if (result?.goal) goal = result.goal; }).catch(() => {});
       cartMessage = 'Suche gestoppt. Bereits hinzugefügte Tickets bleiben im Warenkorb.';
@@ -106,6 +121,7 @@
     ui.querySelector('#start').disabled = running || !eventId(location.href); ui.querySelector('#stop').disabled = !running;
     ui.querySelector('#auto').disabled = armed || inFlight || submitted || !eventId(location.href);
     ui.querySelector('#cart-status').textContent = cartMessage || 'Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.';
+    ui.querySelector('#refresh-status').textContent = refreshMessage;
     ui.querySelector('#goal-progress').textContent = goal ? goal.confirmed.length + ' / ' + goal.target + ' Tickets zuletzt im Warenkorb bestätigt.' : '';
     preferences?.snapshot(last);
     const status = ui.querySelector('#status');
@@ -143,6 +159,7 @@
   window.addEventListener('message', event => {
     if (!running || event.source !== window || event.origin !== location.origin || event.data?.channel !== channel) return;
     const data = event.data;
+    if (data.type === 'refresh-state') { refreshMessage = String(data.message || '').slice(0, 300); render(); return; }
     if (data.type === 'error' || data.type === 'waiting') { error = String(data.message).slice(0, 300); render(); void maybeCart(); return; }
     if (data.type !== 'snapshot') return;
     const s = data.snapshot;

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
-const scripts = ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
+const scripts = ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'refresh.js', 'page-observer.js', 'preferences-ui.js', 'monitor.js'].map(name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8')).join('\n');
 async function setup(browser, delay = 0, expired = false) {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -31,6 +31,7 @@ async function setup(browser, delay = 0, expired = false) {
   await page.addInitScript({ content: `window.commands=[];window.savedPrefs=null;window.testGoal=null;window.testRun=null;
     window.chrome={runtime:{sendMessage:async message=>{window.commands.push(message);
       if(message.type==='goalGet')return{goal:null};
+      if(message.type==='refreshStart'||message.type==='refreshStop')return{running:message.type==='refreshStart',seconds:message.seconds};
       if(message.type==='goalBegin'){window.testGoal={id:'fixture-goal',config:message.config,target:message.config.quantity,confirmed:[],secured:[],status:'watching'};return{goal:window.testGoal};}
       if(message.type==='goalStop'){if(window.testRun)globalThis.TicketCartFlow.cancel(window.testRun);window.testGoal.status='stopped';return{goal:window.testGoal};}
       if(message.type==='cartStop')return globalThis.TicketCartFlow.cancel(message.run);
@@ -55,8 +56,10 @@ async function setup(browser, delay = 0, expired = false) {
     for (let i = 0; i < 4; i++) await panel.getByRole('button', { name: 'VIP-Rang Gold nach oben', exact: true }).click();
     await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).fill('2');
     await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).dispatchEvent('change');
+    await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('2');
+    await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
     const config = await page.evaluate(() => window.savedPrefs);
-    assert.equal(config.quantity, 2); assert.equal(config.groups[0].id, 'vip'); assert.equal(config.groups[0].children[0].id, 'vip-gold');
+    assert.equal(config.quantity, 2); assert.equal(config.refreshSeconds, 2); assert.equal(config.groups[0].id, 'vip'); assert.equal(config.groups[0].children[0].id, 'vip-gold');
     assert.equal(config.groups[0].children.filter(c => c.enabled).length, 2);
     console.log('PASS: category-wide selection, child exclusions, parent indeterminate state, priority arrows and ticket count persist correctly');
     await panel.getByRole('button', { name: 'Automatisch in den Warenkorb', exact: true }).click();

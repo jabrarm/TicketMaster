@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Verfügbarkeitsmonitor",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Wählt Sitzplätze im regulären Werder-Einzelkartenshop und Hospitality-Shop nach Ticketanzahl und Kategoriepräferenzen.",
   "permissions": [
     "activeTab",
@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/*", "https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/*"],
-      "js": ["availability-core.js", "preferences.js", "cart-receipt.js", "cart-flow.js", "page-observer.js"],
+      "js": ["availability-core.js", "preferences.js", "cart-receipt.js", "cart-flow.js", "refresh.js", "page-observer.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },

@@ -5,12 +5,14 @@
   window.__ticketDataObserver = true;
   const { endpoint, Inventory } = globalThis.TicketAvailability;
   const inventory = new Inventory();
+  const requests = globalThis.TicketRefreshTools.createTracker();
   const channel = 'ticket-data-monitor-v1';
   let latest = null;
   globalThis.TicketDataObserver = Object.freeze({
-    version: '1.3.0',
+    version: '1.4.0',
     getSnapshot: () => inventory.last ? structuredClone(inventory.last) : null,
-    getError: () => latest?.type === 'error' ? latest.message : null
+    getError: () => latest?.type === 'error' ? latest.message : null,
+    getRequestState: () => requests.state()
   });
   let sequence = 0;
   const handled = new Map();
@@ -33,20 +35,26 @@
     if (target.kind === 'availability' && inventory.parts.availability) accept(target, inventory.parts.availability);
   };
   const receive = async (target, response) => {
-    if (response.status === 304) { unchanged(target); return; }
-    if (!response.ok) { if (fresh(target)) report('Shopdaten konnten nicht geladen werden (HTTP ' + response.status + ').'); return; }
     try {
+      if (response.status === 304) { unchanged(target); return; }
+      if (!response.ok) { if (fresh(target)) report('Shopdaten konnten nicht geladen werden (HTTP ' + response.status + ').'); return; }
       const text = await response.text();
       if (text.length > 8000000) throw new Error('Saalplan-Daten überschreiten das unterstützte Format.');
       accept(target, JSON.parse(text));
     } catch { if (fresh(target)) report('Shopantwort konnte nicht als Sitzdaten gelesen werden.'); }
+    finally { requests.end(target, response.status, response.headers.get('Retry-After')); }
   };
   const originalFetch = window.fetch;
   window.fetch = function (...args) {
     const target = endpoint(typeof args[0] === 'string' || args[0] instanceof URL ? String(args[0]) : args[0]?.url, location.href);
-    if (target) target.sequence = ++sequence;
-    const result = Reflect.apply(originalFetch, this, args);
-    if (target) result.then(response => { void receive(target, response.clone()); }, () => { if (fresh(target)) report('Netzwerkfehler beim Laden der Shopdaten.'); });
+    if (target) { target.sequence = ++sequence; requests.begin(target); }
+    let result;
+    try { result = Reflect.apply(originalFetch, this, args); }
+    catch (error) { if (target) requests.end(target, 0); throw error; }
+    if (target) result.then(response => {
+      try { void receive(target, response.clone()); }
+      catch { requests.end(target, 0); if (fresh(target)) report('Shopantwort konnte nicht gelesen werden.'); }
+    }, () => { requests.end(target, 0); if (fresh(target)) report('Netzwerkfehler beim Laden der Shopdaten.'); });
     return result;
   };
   const originalOpen = XMLHttpRequest.prototype.open, originalSend = XMLHttpRequest.prototype.send;
@@ -57,8 +65,9 @@
   };
   XMLHttpRequest.prototype.send = function (...args) {
     const target = targets.get(this);
-    if (target) target.sequence = ++sequence;
+    if (target) { target.sequence = ++sequence; requests.begin(target); }
     if (target) this.addEventListener('loadend', () => {
+      try {
       if (this.status === 304) unchanged(target);
       else if (this.status < 200 || this.status >= 300) { if (fresh(target)) report('Shopdaten konnten nicht geladen werden (HTTP ' + this.status + ').'); }
       else {
@@ -67,8 +76,10 @@
           accept(target, data);
         } catch { if (fresh(target)) report('Shopantwort konnte nicht als Sitzdaten gelesen werden.'); }
       }
+      } finally { requests.end(target, this.status, this.status >= 400 ? this.getResponseHeader('Retry-After') : null); }
     }, { once: true });
-    return Reflect.apply(originalSend, this, args);
+    try { return Reflect.apply(originalSend, this, args); }
+    catch (error) { if (target) requests.end(target, 0); throw error; }
   };
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin || event.data?.channel !== channel || event.data.type !== 'request') return;

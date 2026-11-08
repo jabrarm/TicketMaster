@@ -37,7 +37,7 @@ async function setup(browser, regular = false) {
     const result = kind === 'availability' ? { ...data.availability, timestamp: Date.now(), expired: true, seats: [[1001, 1], [1, backend.second ? 1 : 0], [999, 0], [1000, backend.second ? 1 : 0]] } : data[kind];
     return route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(result) });
   });
-  await page.addInitScript({ content: `if(location.pathname.includes('/areaplan/venue/event/')){` + ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js'].map(source).join('\n') + '\n}' });
+  await page.addInitScript({ content: `if(location.pathname.includes('/areaplan/venue/event/')){` + ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'refresh.js', 'page-observer.js'].map(source).join('\n') + '\n}' });
   const stored = {}, contexts = new Map(); let currentContext, click, handleMessage, installing = Promise.resolve();
   async function evaluate(expression, contextId) {
     const r = await cdp.send('Runtime.evaluate', { expression, ...(contextId ? { contextId } : {}), awaitPromise: true, returnByValue: true });
@@ -76,6 +76,7 @@ async function setup(browser, regular = false) {
   await click({ id: 19 });
   const panel = page.locator('#ticket-data-monitor');
   await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).dispatchEvent('change');
+  await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
   await panel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).click();
   try { await page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#goal-progress')?.textContent.includes('1 / 2'), null, { timeout: 15000 }); }
   catch (error) {
@@ -88,6 +89,8 @@ async function setup(browser, regular = false) {
   try {
     const first = await setup(browser);
     assert.deepEqual(first.backend.posts, [[1001]]); assert.equal(first.state().confirmed.length, 1); assert.equal(first.backend.returns, 1);
+    assert.equal(first.state().config.refreshSeconds, 2);
+    assert.equal(await first.page.locator('#ticket-data-monitor').getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).inputValue(), '2');
     await first.page.waitForTimeout(150);
     assert.equal(first.backend.posts.length, 1, 'the still-advertised first seat must not be purchased again');
     first.backend.second = true; await first.page.evaluate(() => sms.refreshAvailability());

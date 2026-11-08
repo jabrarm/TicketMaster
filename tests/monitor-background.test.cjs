@@ -20,7 +20,7 @@ test('toolbar installs both script worlds before toggling, including in tabs ope
   await click({ id: 19 }); assert.equal(calls.length, 4);
   assert.ok(calls.every(x => x.target.tabId === 19));
   assert.equal(calls[0].world, 'MAIN');
-  assert.deepEqual(Array.from(calls[0].files), ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js']);
+  assert.deepEqual(Array.from(calls[0].files), ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'refresh.js', 'page-observer.js']);
   assert.equal(calls[1].world, 'MAIN');
   assert.equal(calls[2].world, 'ISOLATED');
   assert.deepEqual(Array.from(calls[2].files), ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']);

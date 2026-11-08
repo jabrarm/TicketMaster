@@ -53,7 +53,7 @@ async function setup(browser, legacy) {
     await evaluate(`window.oldStarts=0;window.__ticketDataObserver=true;window.TicketCartFlow={version:'1.1.1',start:async()=>{window.oldStarts++;throw new Error('Noch nicht genügend aktuelle, passende Plätze verfügbar.');},cancel:()=>({stage:'stopped'})};`);
   } else {
     // The observer receives the full inventory before the cart module exists.
-    await evaluate(['availability-core.js', 'preferences.js', 'page-observer.js'].map(source).join('\n'));
+    await evaluate(['availability-core.js', 'preferences.js', 'refresh.js', 'page-observer.js'].map(source).join('\n'));
     for (const kind of ['seatmap', 'mapping', 'availability']) await page.evaluate(async url => (await fetch(url)).json(), `https://public-api.eventim.com/seatmap/api/public/${kind}/${identity}`);
     await page.waitForFunction(() => window.TicketDataObserver?.getSnapshot());
   }
@@ -84,6 +84,7 @@ async function setup(browser, legacy) {
     await current.page.waitForFunction(() => window.cartCalls === 1);
     await current.page.waitForFunction(() => document.querySelector('#ticket-data-monitor').shadowRoot.querySelector('#cart-status').textContent.includes('bestätigte Plätze'));
     assert.deepEqual(await current.page.evaluate(() => window.selected.map(s => s.id)), ['s1001']);
+    assert.equal(await current.page.evaluate(() => window.TicketRefresh.state().running), true);
     assert.equal(current.commands.filter(c => c === 'cartStart').length, 1);
     console.log('PASS: real MAIN and ISOLATED worlds exchange messages through the actual background handler; a late-created cart controller reads the observer inventory and completes confirmed selection exactly once');
     await current.page.close();

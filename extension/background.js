@@ -9,8 +9,11 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
     func: async (operation, config, run, secured) => {
       try {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
-        if (globalThis.TicketCartFlow?.version !== '1.3.0' || globalThis.TicketDataObserver?.version !== '1.3.0' || globalThis.TicketPreferences?.version !== '1.3.0') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
-        if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, groups: config.groups } }; }
+        if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
+        if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
+        if (globalThis.TicketCartFlow?.version !== '1.4.0' || globalThis.TicketDataObserver?.version !== '1.4.0' || globalThis.TicketPreferences?.version !== '1.4.0' || globalThis.TicketRefresh?.version !== '1.4.0') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (operation === 'refreshStart') return globalThis.TicketRefresh.start(config.seconds, config.revision);
+        if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
         if (operation === 'baseline') return await globalThis.TicketCartReceipt.baseline();
         if (operation === 'open') { if (typeof sms !== 'undefined' && !sms.isSeatmapLoaded()) document.querySelector('#choose-seat-button')?.click(); return { stage: 'opened' }; }
         if (operation === 'prepare') return await globalThis.TicketCartFlow.prepare(config, run, secured);
@@ -31,18 +34,18 @@ chrome.action.onClicked.addListener(async tab => {
     // Both entry points are idempotent, so the toolbar can repair a missing setup.
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'MAIN',
-      files: ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'page-observer.js']
+      files: ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'refresh.js', 'page-observer.js']
     });
     const [inspection] = await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'MAIN',
       func: expected => ({
         requiresReload: Boolean(globalThis.TicketAvailability.eventId(location.href)) &&
-          (globalThis.TicketCartFlow?.version !== expected || globalThis.TicketDataObserver?.version !== expected || globalThis.TicketPreferences?.version !== expected),
+          (globalThis.TicketCartFlow?.version !== expected || globalThis.TicketDataObserver?.version !== expected || globalThis.TicketPreferences?.version !== expected || globalThis.TicketRefresh?.version !== expected),
         expected,
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.3.0']
+      args: ['1.4.0']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -85,15 +88,17 @@ chrome.action.onClicked.addListener(async tab => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen'].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop'].includes(message?.type)) return;
   const tabId = sender.tab.id;
   let url; try { url = new URL(sender.url); } catch { return; }
   if (url.origin !== 'https://www.ticket-onlineshop.com') return;
   const context = TicketAvailability.shop(url.href), eventPage = context?.type === 'event', cartPage = context?.type === 'cart';
   if (!eventPage && !cartPage) return;
-  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen'].includes(message.type) && !eventPage) return;
+  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop'].includes(message.type) && !eventPage) return;
   (async () => {
     if (message.type === 'cartReload') { await chrome.tabs.reload(tabId); return { stage: 'reloading' }; }
+    if (message.type === 'refreshStart') return await invokeCart(tabId, 'refreshStart', { seconds: message.seconds, documentToken: message.documentToken, revision: message.revision });
+    if (message.type === 'refreshStop') return await invokeCart(tabId, 'refreshStop', { documentToken: message.documentToken, revision: message.revision });
     if (message.type === 'goalBegin') {
       const checked = await invokeCart(tabId, 'validate', message.config);
       if (checked.error) throw new Error(checked.error);

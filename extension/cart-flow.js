@@ -15,11 +15,12 @@
       throw new Error('Der Shop hat die Platzauswahl nicht rechtzeitig bestätigt. Auswahl und Shopfilter bitte prüfen; es wird nichts zum Warenkorb hinzugefügt.');
     }
     const api = {
-      version: '1.3.0',
+      version: '1.4.0',
+      isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.3.0', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.0', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) { cancelled.add(runId); if (active && active.id === runId) { active.cancelled = true; if (active.prepared) active = null; } return { stage: 'stopped' }; },

@@ -67,3 +67,9 @@ test('a raw PK1 offer is allowed only for a fully enabled parent, never after a 
   config.groups[0].children[0].enabled = false;
   assert.equal(prefs.candidates(current, config), null);
 });
+test('polling interval defaults to 20, supports two seconds and accepts legacy settings', () => {
+  const config = prefs.defaults(); assert.equal(config.refreshSeconds, 20);
+  config.refreshSeconds = 2; assert.equal(prefs.validate(config), config);
+  config.refreshSeconds = 1; assert.throws(() => prefs.validate(config), /Intervall|intervall/);
+  delete config.refreshSeconds; assert.equal(prefs.validate(config), config);
+});
