@@ -11,7 +11,7 @@ test('catalogue contains all image groups and five distinct VIP options, includi
 test('regular subcategories require explicit regional data and respect row ranges', () => {
   assert.equal(prefs.match(seat(1, 'PK1', { blockDescription: 'Nord Mitte Unterrang', row: '10' })), 'pk1-nmu');
   assert.equal(prefs.match(seat(1, 'PK1', { blockDescription: 'Nord Mitte Unterrang', row: '9' })), null);
-  assert.equal(prefs.match(seat(1, 'PK1')), null);
+  assert.equal(prefs.match(seat(1, 'PK1')), 'pk1:*');
 });
 test('group order and child exclusions determine fallback selection exactly', () => {
   const config = prefs.defaults(); config.quantity = 2; config.adjacent = false;
@@ -60,4 +60,10 @@ test('partial planning takes an available single now, excludes secured seats, an
   current.seats.push(seat(1), seat(11, 'PK8 VIP-Rang Gold', { group: 'g', order: 1, x: 10, y: 0, spacing: 10 }));
   const remaining = prefs.partialCandidates(current, config, 1, secured);
   assert.equal(remaining.seats[0].id, 11); assert.equal(remaining.adjacent, true);
+});
+test('a raw PK1 offer is allowed only for a fully enabled parent, never after a child exclusion', () => {
+  const config = prefs.defaults(), current = snapshot([seat(1, 'PK1')]);
+  assert.equal(prefs.candidates(current, config).seats[0].id, 1);
+  config.groups[0].children[0].enabled = false;
+  assert.equal(prefs.candidates(current, config), null);
 });

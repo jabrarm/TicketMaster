@@ -1,5 +1,5 @@
 (() => {
-  if (!/^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/shoppingcart\/?$/.test(location.pathname)) return;
+  if (globalThis.TicketAvailability.shop(location.href)?.type !== 'cart') return;
   async function run() {
     const response = await chrome.runtime.sendMessage({ type: 'goalGet' });
     if (!response?.goal) return;

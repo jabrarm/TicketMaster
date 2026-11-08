@@ -1,4 +1,4 @@
-importScripts('cart-session.js');
+importScripts('availability-core.js', 'cart-session.js');
 let goalStore;
 const goals = () => goalStore ||= new TicketGoalSessions.Sessions({
   read: async key => (await chrome.storage.session.get(key))[key] || null,
@@ -9,7 +9,7 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
     func: async (operation, config, run, secured) => {
       try {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
-        if (globalThis.TicketCartFlow?.version !== '1.2.0' || globalThis.TicketDataObserver?.version !== '1.2.0' || globalThis.TicketPreferences?.version !== '1.2.0') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.3.0' || globalThis.TicketDataObserver?.version !== '1.3.0' || globalThis.TicketPreferences?.version !== '1.3.0') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, groups: config.groups } }; }
         if (operation === 'baseline') return await globalThis.TicketCartReceipt.baseline();
         if (operation === 'open') { if (typeof sms !== 'undefined' && !sms.isSeatmapLoaded()) document.querySelector('#choose-seat-button')?.click(); return { stage: 'opened' }; }
@@ -42,7 +42,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.2.0']
+      args: ['1.3.0']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -89,8 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const tabId = sender.tab.id;
   let url; try { url = new URL(sender.url); } catch { return; }
   if (url.origin !== 'https://www.ticket-onlineshop.com') return;
-  const eventPage = /^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/areaplan\/venue\/event\/\d+\/?$/.test(url.pathname);
-  const cartPage = /^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/shoppingcart\/?$/.test(url.pathname);
+  const context = TicketAvailability.shop(url.href), eventPage = context?.type === 'event', cartPage = context?.type === 'cart';
   if (!eventPage && !cartPage) return;
   if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen'].includes(message.type) && !eventPage) return;
   (async () => {
@@ -98,10 +97,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'goalBegin') {
       const checked = await invokeCart(tabId, 'validate', message.config);
       if (checked.error) throw new Error(checked.error);
-      return { goal: await goals().begin(tabId, crypto.randomUUID(), checked.config, url.origin + url.pathname.replace(/\/$/, '')) };
+      return { goal: await goals().begin(tabId, crypto.randomUUID(), checked.config, context.eventUrl) };
     }
     const goal = ['goalGet', 'goalStop', 'goalReceipt', 'goalOpen'].includes(message.type) || message.goalId ? await goals().get(tabId) : null;
-    if (goal && eventPage && goal.eventUrl !== url.origin + url.pathname.replace(/\/$/, '')) throw new Error('Diese Ticketsuche gehört zu einer anderen Veranstaltung.');
+    if (goal && TicketAvailability.shop(goal.eventUrl)?.baseUrl !== context.baseUrl) throw new Error('Diese Ticketsuche gehört zu einem anderen Shop. Bitte die bisherige Suche in ihrem Tab stoppen.');
+    if (goal && eventPage && goal.eventUrl !== context.eventUrl) throw new Error('Diese Ticketsuche gehört zu einer anderen Veranstaltung. Bitte einen neuen Tab verwenden.');
     if (message.type === 'goalGet') return { goal };
     if (['goalStop', 'goalReceipt', 'goalOpen'].includes(message.type) && (!goal || goal.id !== message.goalId)) throw new Error('Die Ticketsuche ist nicht mehr aktiv.');
     if (message.type === 'goalStop') {

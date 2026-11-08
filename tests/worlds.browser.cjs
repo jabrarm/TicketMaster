@@ -38,7 +38,7 @@ async function setup(browser, legacy) {
     } }
   } };
   const context = vm.createContext(sandbox);
-  sandbox.importScripts = name => vm.runInContext(source(name), context);
+  sandbox.importScripts = (...names) => { for (const name of names) vm.runInContext(source(name), context); };
   vm.runInContext(source('background.js'), context);
   await cdp.send('Runtime.addBinding', { name: 'ticketBridgeCall', executionContextId });
   cdp.on('Runtime.bindingCalled', event => {

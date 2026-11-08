@@ -62,15 +62,16 @@
     }
     function refreshCounts() {
       if (!snapshot) return;
-      const counts = new Map(); let unknown = 0;
-      for (const seat of snapshot.seats) { const id = match(seat); if (id) counts.set(id, (counts.get(id) || 0) + 1); else unknown++; }
+      const counts = new Map(); let unknown = 0, parentOnly = 0;
+      for (const seat of snapshot.seats) { const id = match(seat); if (id) { counts.set(id, (counts.get(id) || 0) + 1); if (id.endsWith(':*')) parentOnly++; } else unknown++; }
       for (const group of config.groups) {
-        const count = group.children.filter(c => c.enabled).reduce((n, c) => n + (counts.get(c.id) || 0), 0);
+        const count = group.children.filter(c => c.enabled).reduce((n, c) => n + (counts.get(c.id) || 0), 0) + (group.children.every(c => c.enabled) ? counts.get(group.id + ':*') || 0 : 0);
         const el = container.querySelector('[data-group-count="' + group.id + '"]');
         const expired = snapshot.stale || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < Date.now());
         if (el) el.textContent = count + (expired ? ' Sitzangebote aus der Shop-Liste; Bestätigung bei Platzwahl erforderlich' : ' aktuell gemeldete Sitze in gewählten Unterkategorien');
       }
-      container.querySelector('[data-unmatched]').textContent = (unknown ? unknown + ' Sitze lassen sich keiner Unterkategorie eindeutig zuordnen und werden nicht automatisch gewählt. ' : '') + 'Die Hospitality-Seite liefert VIP-Angebote. Kategorien ohne passende Shopdaten bleiben für die Automatik unberücksichtigt.';
+      const context = globalThis.TicketAvailability.shop(location.href);
+      container.querySelector('[data-unmatched]').textContent = (unknown ? unknown + ' Sitze lassen sich keiner Unterkategorie eindeutig zuordnen und werden nicht automatisch gewählt. ' : '') + (parentOnly ? parentOnly + ' Angebote sind nur ihrer Platzkategorie zugeordnet: automatisch auswählbar nur bei vollständig angehakter Oberkategorie, ohne einzelne Abwahlen. ' : '') + (context?.kind === 'regular' ? 'Regulärer Werder-Einzelkartenshop. ' : 'Die Hospitality-Seite liefert VIP-Angebote. ') + 'Kategorien ohne passende Shopdaten bleiben für die Automatik unberücksichtigt.';
     }
     render();
     if (typeof chrome !== 'undefined' && chrome.storage?.local) chrome.storage.local.get('ticketPreferencesV1').then(data => {

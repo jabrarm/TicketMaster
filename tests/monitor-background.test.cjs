@@ -5,7 +5,7 @@ const fs = require('node:fs');
 function setup(failing = false) {
   let click, message; const calls = [], badges = [], titles = [];
   vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname, '../extension/background.js'), 'utf8'), {
-    URL, importScripts() {}, console: { error() {} }, chrome: {
+    URL, TicketAvailability: require('../extension/availability-core.js'), importScripts() {}, console: { error() {} }, chrome: {
       runtime: { id: 'test-extension', onMessage: { addListener: fn => { message = fn; } } },
       action: { onClicked: { addListener: fn => { click = fn; } },
         setBadgeText: async value => badges.push(value), setBadgeBackgroundColor: async () => {}, setTitle: async value => titles.push(value) },

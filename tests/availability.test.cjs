@@ -2,6 +2,19 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { Inventory, Tracker, endpoint, eventId } = require('../extension/availability-core.js');
 const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
+test('regular Werder single-ticket event and cart URLs have their own supported shop scope', () => {
+  const { shop } = require('../extension/availability-core.js');
+  const url = 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382';
+  assert.equal(eventId(url), '674382');
+  const context = shop(url + '?view=map');
+  assert.equal(context.kind, 'regular'); assert.equal(context.eventUrl, url);
+  assert.equal(context.cartUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart');
+  assert.equal(shop(context.cartUrl).type, 'cart');
+  assert.equal(shop(url.replace('werderbremen/', 'another-shop/')), null);
+  assert.equal(shop(url.replace('.com/', '.com:8443/')), null);
+  assert.equal(endpoint('https://public-api.eventim.com/seatmap/api/public/availability/tixx-1001-674382', url).kind, 'availability');
+  assert.equal(endpoint('https://public-api.eventim.com/seatmap/api/public/availability/tixx-1001-674379', url), null);
+});
 function loaded(data = fixture()) {
   const inventory = new Inventory(); let snapshot;
   for (const kind of ['seatmap', 'mapping', 'availability']) snapshot = inventory.accept(kind, data[kind], identity, 5000);

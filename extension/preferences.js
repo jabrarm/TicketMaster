@@ -40,15 +40,22 @@
     const number = source.match(/(?:^|\b)(?:pk\s*|platzkategorie\s*)([1-5])(?:\b|\s)/)?.[1];
     if (!number) return null;
     const group = catalog.find(g => g.id === 'pk' + number);
-    return group.children.find(c => {
+    const matched = group.children.find(c => {
       if (!source.includes(normal(c.region))) return false;
       if (c.min == null) return true;
       return /^\d+$/.test(String(seat.row)) && Number(seat.row) >= c.min && Number(seat.row) <= c.max;
-    })?.id || null;
+    });
+    if (matched) return matched.id;
+    // A price category without region metadata is usable only when the entire
+    // parent is allowed. Explicitly conflicting row/region data never falls back.
+    return group.children.some(c => source.includes(normal(c.region))) ? null : group.id + ':*';
   }
   function rank(config) {
     validate(config);
-    return new Map(config.groups.flatMap(g => g.children.filter(c => c.enabled).map(c => c.id)).map((id, index) => [id, index]));
+    return new Map(config.groups.flatMap(g => [
+      ...g.children.filter(c => c.enabled).map(c => c.id),
+      ...(g.id !== 'vip' && g.children.every(c => c.enabled) ? [g.id + ':*'] : [])
+    ]).map((id, index) => [id, index]));
   }
   function plan(snapshot, config, now = Date.now(), cacheCandidates = false) {
     const ranks = rank(config);
@@ -111,7 +118,7 @@
     }
     return null;
   }
-  const api = { version: '1.2.0', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates };
+  const api = { version: '1.3.0', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

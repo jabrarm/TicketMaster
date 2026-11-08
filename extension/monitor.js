@@ -112,7 +112,7 @@
     const stale = last && Date.now() - last.checkedAt > 120000;
     const expired = last?.stale || (last && Number.isFinite(last.validUntil) && last.validUntil < Date.now());
     status.classList.toggle('error', Boolean(error || stale || expired));
-    status.textContent = !eventId(location.href) ? 'Diese Adresse wird noch nicht unterstützt. Öffne den Saalplan im Werder-Hospitality-Shop; die Adresse muss mit /areaplan/venue/event/<ID> enden.'
+    status.textContent = !eventId(location.href) ? 'Diese Seite wird noch nicht unterstützt. Öffne mit „Jetzt Plätze auswählen“ den Saalplan im regulären Werder-Einzelkartenshop oder im Werder-Hospitality-Shop. Unterstützt werden deren Adressen mit /areaplan/venue/event/<ID>.'
       : !running ? 'Gestoppt. Mit „Überwachung starten“ einen neuen Ausgangsbestand erfassen.'
       : error || (expired ? 'Die Shop-Liste ist als abgelaufen markiert. Angezeigte Sitze sind unverbindliche Angebote; die Automatik lässt jeden Sitz durch den Shop bestätigen.'
         : stale ? 'Seit über zwei Minuten keine bestätigte Aktualisierung. Der angezeigte Stand kann veraltet sein.'

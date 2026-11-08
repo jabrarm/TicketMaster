@@ -15,11 +15,11 @@
       throw new Error('Der Shop hat die Platzauswahl nicht rechtzeitig bestätigt. Auswahl und Shopfilter bitte prüfen; es wird nichts zum Warenkorb hinzugefügt.');
     }
     const api = {
-      version: '1.2.0',
+      version: '1.3.0',
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.2.0', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.3.0', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) { cancelled.add(runId); if (active && active.id === runId) { active.cancelled = true; if (active.prepared) active = null; } return { stage: 'stopped' }; },
@@ -104,7 +104,9 @@
     button: () => document.querySelectorAll('#add-to-cart').length === 1 ? document.querySelector('#add-to-cart') : null,
     validForm: form => {
       if (!form || form.method.toLowerCase() !== 'post') return false;
-      const action = new URL(form.action, location.href), path = location.pathname.replace(/areaplan\/venue\/event\/\d+\/?$/, 'shoppingcart/addselecteditemsareas/event/' + eventId());
+      const context = globalThis.TicketAvailability.shop(location.href);
+      if (context?.type !== 'event') return false;
+      const action = new URL(form.action, location.href), path = context.basePath + 'shoppingcart/addselecteditemsareas/event/' + eventId();
       return action.origin === location.origin && action.pathname === path;
     },
     cardReady: id => [...document.querySelectorAll('#seat-cards-list > li[data-seat-identifier]')].some(card => card.getAttribute('data-seat-identifier') === id && !card.classList.contains('hidden-card') && card.querySelector('input,select')),

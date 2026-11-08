@@ -1,21 +1,25 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-const { fixture, pageUrl } = require('./availability.fixture.cjs');
+const { fixture } = require('./availability.fixture.cjs');
 const source = name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8');
 const base = '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
-async function setup(browser) {
+async function setup(browser, regular = false) {
+  const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
+  const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
   const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0 };
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
+  for (const part of Object.values(data)) part.seatmapId = event;
+  if (regular) for (const category of data.mapping.priceCategories) category.name = 'PK1';
   const cartHtml = () => '<!doctype html><meta charset="utf-8"><title>Warenkorb</title>' + (backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) => `<li class="seat-card" data-seat-identifier="cart-${i + 1}" data-seat-id="${item}">Ticket</li>`).join('') + '</ul>' : '<div class="empty-state">Keine Tickets</div>') + '<a id="continue-shopping-button" href="' + base + 'index">Weiter einkaufen</a>';
   const eventHtml = `<!doctype html><meta charset="utf-8"><title>Test-Saalplan</title><button id="choose-seat-button">Jetzt Plätze auswählen</button>
-  <form id="seatCardForm" method="post" action="${base}shoppingcart/addselecteditemsareas/event/674379"><ul id="seat-cards-list"></ul><button id="add-to-cart" type="submit">In den Warenkorb</button></form><script>
+  <form id="seatCardForm" method="post" action="${base}shoppingcart/addselecteditemsareas/event/${event}"><ul id="seat-cards-list"></ul><button id="add-to-cart" type="submit">In den Warenkorb</button></form><script>
   window.selected=[];let mapReady=false;
   const api='https://public-api.eventim.com/seatmap/api/public/';
-  let sms={isSeatmapLoaded:()=>mapReady,refreshAvailability:async()=>{await(await fetch(api+'availability/tixx-1001-674379')).json();},selectById:id=>{window.selected.push({id});const li=document.createElement('li');li.dataset.seatIdentifier=id;const input=document.createElement('input');input.type='hidden';input.name='selected';input.value=id;li.append(input);document.querySelector('#seat-cards-list').append(li);}};
+  let sms={isSeatmapLoaded:()=>mapReady,refreshAvailability:async()=>{await(await fetch(api+'availability/tixx-1001-${event}')).json();},selectById:id=>{window.selected.push({id});const li=document.createElement('li');li.dataset.seatIdentifier=id;const input=document.createElement('input');input.type='hidden';input.name='selected';input.value=id;li.append(input);document.querySelector('#seat-cards-list').append(li);}};
   let seatSelection={getSelectedSeats:()=>window.selected,getLostSeatAmount:()=>0,options:{filterBar:{getMaxTicketsAmount:()=>6}}};
-  document.querySelector('#choose-seat-button').onclick=async()=>{if(mapReady)return;for(const kind of ['seatmap','mapping','availability'])await(await fetch(api+kind+'/tixx-1001-674379')).json();mapReady=true;};
+  document.querySelector('#choose-seat-button').onclick=async()=>{if(mapReady)return;for(const kind of ['seatmap','mapping','availability'])await(await fetch(api+kind+'/tixx-1001-${event}')).json();mapReady=true;};
   </script>`;
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
@@ -47,7 +51,7 @@ async function setup(browser) {
     tabs: { reload: async () => page.reload(), update: async (id, value) => { assert.equal(id, 19); backend.returns++; await page.goto(value.url); } },
     scripting: { executeScript: async options => [{ frameId: 0, result: await evaluate(options.files ? options.files.map(source).join('\n') : '(' + options.func.toString() + ')(...' + JSON.stringify(options.args || []) + ')', options.world === 'ISOLATED' ? currentContext : undefined) }] }
   } };
-  const context = vm.createContext(sandbox); sandbox.importScripts = n => vm.runInContext(source(n), context); vm.runInContext(source('background.js'), context);
+  const context = vm.createContext(sandbox); sandbox.importScripts = (...names) => { for (const n of names) vm.runInContext(source(n), context); }; vm.runInContext(source('background.js'), context);
   cdp.on('Runtime.bindingCalled', event => {
     if (event.name !== 'goalBridge' || !contexts.has(event.executionContextId)) return;
     const { id, message } = JSON.parse(event.payload);
@@ -63,10 +67,10 @@ async function setup(browser) {
       await cdp.send('Runtime.addBinding', { name: 'goalBridge', executionContextId });
       await evaluate(`window.__answers={};window.__n=0;window.chrome={runtime:{sendMessage:message=>new Promise(resolve=>{const id=++window.__n;window.__answers[id]=v=>{delete window.__answers[id];resolve(v);};window.goalBridge(JSON.stringify({id,message}));})},storage:{local:{get:async()=>({}),set:async()=>{}}}};`, executionContextId);
       const cart = new URL(page.url()).pathname === base + 'shoppingcart';
-      await evaluate((cart ? ['cart-receipt.js', 'cart-return.js'] : ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']).map(source).join('\n'), executionContextId);
+      await evaluate((cart ? ['availability-core.js', 'cart-receipt.js', 'cart-return.js'] : ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']).map(source).join('\n'), executionContextId);
     })(); installing.catch(() => {});
   });
-  await page.goto(pageUrl); await installing;
+  await page.goto(startUrl); await installing;
   await page.getByRole('button', { name: 'Jetzt Plätze auswählen' }).click({ timeout: 5000 });
   await page.waitForFunction(() => window.TicketDataObserver?.getSnapshot());
   await click({ id: 19 });
@@ -101,5 +105,15 @@ async function setup(browser) {
     assert.deepEqual(stopped.backend.posts, [[1001]]); assert.deepEqual(stopped.backend.items, [1001]);
     console.log('PASS: stopping after the first confirmed ticket preserves it and prevents a later second purchase');
     await stopped.page.close();
+
+    const regular = await setup(browser, true);
+    assert.deepEqual(regular.backend.posts, [[1001]]);
+    regular.backend.second = true; await regular.page.evaluate(() => sms.refreshAvailability());
+    await regular.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
+    assert.deepEqual(regular.backend.posts, [[1001], [1002]]);
+    assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart');
+    assert.equal(regular.state().eventUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382');
+    console.log('PASS: the regular Einzelkarten shop uses its own event, cart and return URLs throughout partial-ticket collection');
+    await regular.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

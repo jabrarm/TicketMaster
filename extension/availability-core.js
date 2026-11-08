@@ -17,13 +17,19 @@
       return { id, value: row[1], category };
     });
   }
-  function eventId(url) {
+  function shop(url) {
     try {
       const u = new URL(url);
-      if (u.protocol !== 'https:' || u.hostname !== 'www.ticket-onlineshop.com') return null;
-      return u.pathname.match(/^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/areaplan\/venue\/event\/(\d+)\/?$/)?.[1] || null;
+      if (u.origin !== 'https://www.ticket-onlineshop.com') return null;
+      const basePath = ['/ols/werderbremen-hospitality/de/tageskarte/channel/shop/', '/ols/werderbremen/de/einzelkarten/channel/shop/'].find(base => u.pathname.startsWith(base));
+      if (!basePath) return null;
+      const tail = u.pathname.slice(basePath.length), id = tail.match(/^areaplan\/venue\/event\/(\d+)\/?$/)?.[1] || null;
+      return { basePath, baseUrl: u.origin + basePath, type: id ? 'event' : /^shoppingcart\/?$/.test(tail) ? 'cart' : 'other',
+        eventId: id, eventUrl: id ? u.origin + basePath + 'areaplan/venue/event/' + id : null,
+        cartUrl: u.origin + basePath + 'shoppingcart', kind: basePath.includes('werderbremen-hospitality') ? 'hospitality' : 'regular' };
     } catch { return null; }
   }
+  const eventId = url => shop(url)?.eventId || null;
   function endpoint(url, pageUrl) {
     try {
       const u = new URL(url, pageUrl), event = eventId(pageUrl);
@@ -116,7 +122,7 @@
       return { baseline, added, removed };
     }
   }
-  const api = { eventId, endpoint, Inventory, Tracker };
+  const api = { shop, eventId, endpoint, Inventory, Tracker };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketAvailability = api;
 })();

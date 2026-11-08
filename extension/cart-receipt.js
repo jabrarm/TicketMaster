@@ -9,11 +9,11 @@
     return { valid, keys, entries: cards.map((c, i) => ({ key: keys[i], seatId: c.getAttribute('data-seat-id') || null })) };
   }
   async function baseline() {
-    const event = globalThis.TicketAvailability.eventId(location.href);
-    if (!event) throw new Error('Unbekannte Ticketseite.');
-    const path = location.pathname.replace(/areaplan\/venue\/event\/\d+\/?$/, 'shoppingcart');
-    const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store' });
-    if (!response.ok || new URL(response.url).origin !== location.origin || !/^\/ols\/werderbremen-hospitality\/de\/tageskarte\/channel\/shop\/shoppingcart\/?$/.test(new URL(response.url).pathname)) throw new Error('Der bestehende Warenkorb konnte nicht gelesen werden.');
+    const context = globalThis.TicketAvailability.shop(location.href);
+    if (context?.type !== 'event') throw new Error('Unbekannte Ticketseite.');
+    const response = await fetch(context.cartUrl, { credentials: 'same-origin', cache: 'no-store' });
+    const returned = globalThis.TicketAvailability.shop(response.url);
+    if (!response.ok || returned?.type !== 'cart' || returned.baseUrl !== context.baseUrl) throw new Error('Der bestehende Warenkorb konnte nicht im richtigen Shop gelesen werden.');
     const receipt = read(new DOMParser().parseFromString(await response.text(), 'text/html'));
     if (!receipt.valid) throw new Error('Der Warenkorb hat ein unbekanntes Format. Es wird nichts automatisch hinzugefügt.');
     return receipt;
