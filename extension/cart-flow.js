@@ -42,12 +42,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.4',
+      version: '1.4.5',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.4', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.5', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {

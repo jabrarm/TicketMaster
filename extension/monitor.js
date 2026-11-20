@@ -118,12 +118,12 @@
     if (sessionBlocked(session)) return;
     tracker.reset(); last = null; change = null; error = ''; changes = []; running = true;
     render(); window.postMessage({ channel, type: 'request' }, location.origin);
-    updateRefresh();
+    updateRefresh(true);
     void checkSession();
   }
-  function updateRefresh() {
+  function updateRefresh(openMap = false) {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-    void chrome.runtime.sendMessage({ type: 'refreshStart', seconds: config.refreshSeconds ?? 20, ...refreshCommand() }).then(result => {
+    void chrome.runtime.sendMessage({ type: 'refreshStart', seconds: config.refreshSeconds ?? 20, openMap, ...refreshCommand() }).then(result => {
       if (result?.error) { refreshMessage = 'Aktualisierung konnte nicht gestartet werden: ' + result.error; render(); }
     }).catch(e => { refreshMessage = 'Aktualisierung nicht bestätigt: ' + e.message; render(); });
   }
@@ -194,6 +194,7 @@
         : expired ? 'Der Shop meldet einen abgelaufenen Listenstand. Die Automatik prüft passende Sitzangebote über die normale Platzwahl.'
         : !last ? 'Warte auf Shopdaten. Öffne den Saalplan; falls nötig, lade die Ticketseite neu.'
           : change?.baseline ? 'Ausgangsbestand erfasst. Warte auf die nächste Aktualisierung des Shops.'
+            : change?.unchanged ? 'Shopantwort empfangen. Der Zeitstempel und die freien Sitzplätze sind unverändert.'
             : `Shopdaten aktualisiert · ${change?.added.length || 0} neu frei · ${change?.removed.length || 0} nicht mehr frei.`);
     ui.querySelector('#checked').textContent = last ? 'Letzter bestätigter Datenempfang: ' + clock(last.checkedAt) : 'Noch kein bestätigter Datenstand.';
     ui.querySelector('#count').textContent = last ? String(last.seats.length) : '–';
@@ -239,7 +240,8 @@
       const next = tracker.update(s);
       if (s.stale || (Number.isFinite(s.validUntil) && s.validUntil < Date.now())) { last = s; change = null; error = ''; void maybeCart(); queueRender(); return; }
       if (!next) return;
-      last = s; change = next; error = '';
+      const unchanged = last && last.version === s.version && last.timestamp === s.timestamp && !next.added.length && !next.removed.length;
+      last = s; change = { ...next, unchanged }; error = '';
       void maybeCart();
       if (next.added.length && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) void chrome.runtime.sendMessage({ type: 'availabilityPing' }).catch(() => {});
       if (next.baseline) changes = [];
@@ -268,8 +270,7 @@
     goal = result.goal; mount(); config = goal.config; preferences.set(config);
     if (goal.status === 'watching') {
       start(); armed = true; preferences.lock(true); cartMessage = goal.confirmed.length + ' von ' + goal.target + ' Tickets bestätigt. Suche wird für die Restmenge fortgesetzt.';
-      await chrome.runtime.sendMessage({ type: 'goalOpen', goalId: goal.id });
-      render(); void maybeCart();
+      void maybeCart(); queueRender();
     } else { cartMessage = goal.message || 'Warenkorbübergabe noch unbestätigt. Bitte den Warenkorb prüfen; kein automatischer Wiederholungsversuch.'; submitted = goal.status === 'completed' || Boolean(goal.pending); render(); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { void resumeGoal().catch(() => {}); }, { once: true });

@@ -53,3 +53,28 @@ test('late start and stop commands cannot override a more recent user action', (
   control.start(2, 1); control.stop(2); control.start(2, 1); assert.equal(control.state().running, false);
   control.start(2, 3); control.stop(2); assert.equal(control.state().running, true); control.stop(4);
 });
+
+test('a delayed native map button is used once on start, while interval changes and stops do not reopen it', async () => {
+  const c = clock(); let buttonReady = false, clicks = 0;
+  const control = createController({
+    ...c, client: () => null, state: () => ({ active: 0, retryUntil: 0 }),
+    openMap: () => { if (!buttonReady) return false; clicks++; return true; }
+  });
+  control.start(0.5, 1, true);
+  await c.advance(500); assert.equal(clicks, 0);
+  buttonReady = true;
+  await c.advance(500); assert.equal(clicks, 1);
+  control.start(1, 2);
+  await c.advance(5000); assert.equal(clicks, 1);
+  control.stop(3);
+  control.start(0.5, 1, true);
+  await c.advance(5000); assert.equal(clicks, 1);
+});
+test('shop calls that do not start an availability request report that distinction', async () => {
+  const c = clock(), messages = [], tracker = createTracker(c.now);
+  const client = { isSeatmapLoaded: () => true, refreshAvailability() {} };
+  const control = createController({ ...c, client: () => client, state: tracker.state, emit: ({ message }) => messages.push(message) });
+  control.start(0.5);
+  await c.advance(500);
+  assert.match(messages.at(-1), /keine neue Verfügbarkeitsanfrage/);
+});

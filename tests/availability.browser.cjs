@@ -104,7 +104,7 @@ const { fixture, identity, pageUrl } = require('./availability.fixture.cjs');
     assert.equal(await panel.locator('#count').textContent(), '2');
     unchanged = true;
     await page.evaluate(async url => { const response = await fetch(url); if (response.status !== 304) throw new Error('Expected 304'); }, `https://public-api.eventim.com/seatmap/api/public/availability/${identity}`);
-    await waitStatus('0 neu frei');
+    await waitStatus('unverändert');
     assert.equal(await panel.locator('#count').textContent(), '2');
     console.log('PASS: delayed older responses cannot overwrite the latest inventory; HTTP 304 confirms unchanged availability');
     await panel.getByRole('button', { name: 'Schließen' }).click();

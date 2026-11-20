@@ -35,12 +35,13 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.4' || globalThis.TicketDataObserver?.version !== '1.4.4' || globalThis.TicketPreferences?.version !== '1.4.4' || globalThis.TicketRefresh?.version !== '1.4.4') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
-        if (operation === 'refreshStart') return globalThis.TicketRefresh.start(config.seconds, config.revision);
+        if (globalThis.TicketCartFlow?.version !== '1.4.5' || globalThis.TicketDataObserver?.version !== '1.4.5' || globalThis.TicketPreferences?.version !== '1.4.5' || globalThis.TicketRefresh?.version !== '1.4.5') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (operation === 'refreshStart') {
+          return globalThis.TicketRefresh.start(config.seconds, config.revision, config.openMap);
+        }
         if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, selectionMode: config.selectionMode ?? 'preference', adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
         if (operation === 'session') return { session: await globalThis.TicketCartReceipt.checkSession() };
         if (operation === 'baseline') return await globalThis.TicketCartReceipt.baseline();
-        if (operation === 'open') { if (typeof sms !== 'undefined' && !sms.isSeatmapLoaded()) document.querySelector('#choose-seat-button')?.click(); return { stage: 'opened' }; }
         if (operation === 'prepare') return await globalThis.TicketCartFlow.prepare(config, run, secured);
         if (operation === 'submit') return globalThis.TicketCartFlow.submit(run);
         if (operation === 'start') return await globalThis.TicketCartFlow.start(config, run);
@@ -70,7 +71,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.4']
+      args: ['1.4.5']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -115,13 +116,13 @@ chrome.action.onClicked.addListener(async tab => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message?.type)) return;
   const tabId = sender.tab.id;
   let url; try { url = new URL(sender.url); } catch { return; }
   if (url.origin !== 'https://www.ticket-onlineshop.com') return;
   const context = TicketAvailability.shop(url.href), eventPage = context?.type === 'event', cartPage = context?.type === 'cart';
   if (!eventPage && !cartPage) return;
-  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message.type) && !eventPage) return;
+  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message.type) && !eventPage) return;
   const stopKey = tabId + ':' + message.goalId;
   const stopping = message.type === 'goalStop';
   if (stopping) stopRequests.set(stopKey, (stopRequests.get(stopKey) || 0) + 1);
@@ -130,18 +131,18 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'sessionCheck') return await invokeCart(tabId, 'session');
     if (message.type === 'availabilityPing') { notifySound('ping'); return {}; }
     if (message.type === 'cartReload') { await chrome.tabs.reload(tabId); return { stage: 'reloading' }; }
-    if (message.type === 'refreshStart') return await invokeCart(tabId, 'refreshStart', { seconds: message.seconds, documentToken: message.documentToken, revision: message.revision });
+    if (message.type === 'refreshStart') return await invokeCart(tabId, 'refreshStart', { seconds: message.seconds, documentToken: message.documentToken, revision: message.revision, openMap: message.openMap === true });
     if (message.type === 'refreshStop') return await invokeCart(tabId, 'refreshStop', { documentToken: message.documentToken, revision: message.revision });
     if (message.type === 'goalBegin') {
       const checked = await invokeCart(tabId, 'validate', message.config);
       if (checked.error) throw new Error(checked.error);
       return { goal: await goals().begin(tabId, crypto.randomUUID(), checked.config, context.eventUrl) };
     }
-    const goal = ['goalGet', 'goalStop', 'goalReceipt', 'goalOpen'].includes(message.type) || message.goalId ? await goals().get(tabId) : null;
+    const goal = ['goalGet', 'goalStop', 'goalReceipt'].includes(message.type) || message.goalId ? await goals().get(tabId) : null;
     if (goal && TicketAvailability.shop(goal.eventUrl)?.baseUrl !== context.baseUrl) throw new Error('Diese Ticketsuche gehört zu einem anderen Shop. Bitte die bisherige Suche in ihrem Tab stoppen.');
     if (goal && eventPage && goal.eventUrl !== context.eventUrl) throw new Error('Diese Ticketsuche gehört zu einer anderen Veranstaltung. Bitte einen neuen Tab verwenden.');
     if (message.type === 'goalGet') return { goal };
-    if (['goalStop', 'goalReceipt', 'goalOpen'].includes(message.type) && (!goal || goal.id !== message.goalId)) throw new Error('Die Ticketsuche ist nicht mehr aktiv.');
+    if (['goalStop', 'goalReceipt'].includes(message.type) && (!goal || goal.id !== message.goalId)) throw new Error('Die Ticketsuche ist nicht mehr aktiv.');
     if (message.type === 'goalStop') {
       const stopped = await goals().stop(tabId, goal.id);
       if (eventPage && goal.pending?.run) await invokeCart(tabId, 'cancel', null, goal.pending.run).catch(() => {});
@@ -156,10 +157,6 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       });
       if (accepted && confirmed.status === 'watching') await chrome.tabs.update(tabId, { url: confirmed.eventUrl });
       return { goal: confirmed };
-    }
-    if (message.type === 'goalOpen') {
-      if (goal.status !== 'watching') return { goal };
-      return await invokeCart(tabId, 'open');
     }
     if (message.type === 'cartStop') return await invokeCart(tabId, 'cancel', null, message.run);
     if (!message.goalId) return await invokeCart(tabId, 'start', message.config, message.run);

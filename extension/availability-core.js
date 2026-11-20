@@ -62,32 +62,40 @@
     return seats;
   }
   class Inventory {
-    constructor() { this.parts = {}; this.identity = null; this.last = null; this.timestamp = -Infinity; }
+    constructor() { this.parts = {}; this.identity = null; this.last = null; this.availabilityReceivedAt = null; }
     accept(kind, data, identity, now = Date.now()) {
       if (!['seatmap', 'mapping', 'availability'].includes(kind)) fail('Unbekannte Datenquelle.');
       if (!data || typeof data !== 'object' || String(data.seatmapId) !== identity.split('-').at(-1)) fail('Saalplan-Zuordnung fehlt.');
       if (data.seatmapVersion == null) fail('Saalplan-Version fehlt.');
       if (this.identity !== identity) {
-        this.parts = {}; this.last = null; this.timestamp = -Infinity; this.identity = identity;
+        this.parts = {}; this.last = null; this.availabilityReceivedAt = null; this.identity = identity;
       }
       if (kind === 'availability') {
         if (!Number.isFinite(data.timestamp)) fail('Zeitstempel der Verfügbarkeit fehlt.');
-        if (this.parts.availability?.seatmapVersion === data.seatmapVersion && data.timestamp < this.timestamp) return null;
+        const previous = this.parts.availability;
+        if (previous && String(previous.seatmapVersion) === String(data.seatmapVersion) && data.timestamp < previous.timestamp) return null;
       }
       // Construct a candidate before committing, so a failed response cannot replace a valid baseline.
       const parts = { ...this.parts, [kind]: data };
-      const candidate = parts.seatmap && parts.mapping && parts.availability && (!this.last || kind === 'availability') ? this.build(parts, now) : null;
-      this.parts = parts;
-      if (candidate) { this.last = candidate; this.timestamp = parts.availability.timestamp; }
+      const checkedAt = kind === 'availability' ? now : this.availabilityReceivedAt;
+      const complete = parts.seatmap && parts.mapping && parts.availability;
+      const candidate = complete ? this.build(parts, checkedAt, now) : null;
+      this.parts = parts; this.availabilityReceivedAt = checkedAt;
+      if (candidate) this.last = candidate;
       return candidate;
     }
-    build(parts, now) {
+    build(parts, checkedAt, now) {
       const { seatmap, mapping, availability } = parts;
       const versions = [seatmap, mapping, availability].map(x => String(x.seatmapVersion));
       if (new Set(versions).size !== 1) return null; // Wait for the matching map/mapping response.
-      const seats = geometry(seatmap);
-      const categories = new Map(array(mapping.priceCategories).map(x => [x.id, String(x.name || x.id)]));
-      const mappings = new Map(deltaRows(mapping.seats, 3).map(x => [x.id, x]));
+      if (this.geometryCache?.source !== seatmap) this.geometryCache = { source: seatmap, seats: geometry(seatmap) };
+      if (this.mappingCache?.source !== mapping) {
+        const categories = new Map(array(mapping.priceCategories).map(x => [x.id, String(x.name || x.id)]));
+        const mappings = new Map(deltaRows(mapping.seats, 3).map(x => [x.id, x]));
+        this.mappingCache = { source: mapping, categories, mappings };
+      }
+      const { seats } = this.geometryCache;
+      const { categories, mappings } = this.mappingCache;
       const result = [], seen = new Set();
       for (const item of deltaRows(availability.seats, 2)) {
         if (seen.has(item.id) || ![0, 1].includes(item.value)) fail('Unbekannter Sitzstatus.');
@@ -101,7 +109,7 @@
         result.push({ ...seat, category: categories.get(entry.category), categoryId: entry.category });
       }
       const stale = availability.expired === true || (Number.isFinite(availability.expiryTimestamp) && availability.expiryTimestamp < now);
-      return { inventory: this.identity, version: versions[0], timestamp: availability.timestamp, checkedAt: now, stale,
+      return { inventory: this.identity, version: versions[0], timestamp: availability.timestamp, checkedAt, stale,
         validUntil: Number.isFinite(availability.expiryTimestamp) ? availability.expiryTimestamp : null,
         seats: result };
     }

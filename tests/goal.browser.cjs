@@ -88,8 +88,8 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     })(); installing.catch(() => {});
   });
   await page.goto(startUrl); await installing;
-  await page.getByRole('button', { name: 'Jetzt Plätze auswählen' }).click({ timeout: 5000 });
-  await page.waitForFunction(() => window.TicketDataObserver?.getSnapshot());
+  assert.equal(await page.evaluate(() => sms.isSeatmapLoaded()), false);
+  assert.equal(await page.evaluate(() => TicketDataObserver.getSnapshot()), null);
   await click({ id: 19 });
   const panel = page.locator('#ticket-data-monitor');
   await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).dispatchEvent('change');
@@ -111,13 +111,15 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     assert.equal(await first.page.locator('#ticket-data-monitor').getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).inputValue(), '0.5');
     await first.page.waitForTimeout(150);
     assert.equal(first.backend.posts.length, 1, 'the still-advertised first seat must not be purchased again');
-    first.backend.second = true; await first.page.evaluate(() => sms.refreshAvailability());
+    first.backend.second = true;
+    await first.page.reload();
+
     await first.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
     assert.deepEqual(first.backend.posts, [[1001], [1002]]); assert.deepEqual(first.backend.items, [1001, 1002]);
     assert.equal(first.state().status, 'completed'); assert.equal(first.backend.returns, 1);
     assert.deepEqual(first.backend.sounds, ['horn', 'horn']);
     assert.equal(new URL(first.page.url()).pathname, base + 'shoppingcart');
-    console.log('PASS: native form navigation confirms ticket 1, automatically resumes only the remainder, excludes its repeated API offer, later adds neighbouring ticket 2 and stays in the cart at 2/2');
+    console.log('PASS: starts with the seat map closed; after manual reload, opens the map again and adds only the missing ticket');
     await first.page.close();
     const stopped = await setup(browser);
     await stopped.page.locator('#ticket-data-monitor').getByRole('button', { name: 'Stoppen', exact: true }).click();

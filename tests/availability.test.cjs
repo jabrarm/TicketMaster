@@ -66,11 +66,12 @@ test('expired snapshots never replace a valid tracking baseline or announce avai
 test('older data is ignored, version changes wait for matching sources and start a new baseline', () => {
   const { inventory, snapshot, data } = loaded();
   assert.equal(inventory.accept('availability', { ...data.availability, timestamp: 500 }, identity), null);
-  assert.equal(inventory.accept('availability', { ...data.availability, timestamp: 2000, seatmapVersion: 8 }, identity), null);
-  assert.equal(inventory.accept('seatmap', { ...data.seatmap, seatmapVersion: 8 }, identity), null);
-  // The next complete availability response confirms the new version.
-  inventory.accept('mapping', { ...data.mapping, seatmapVersion: 8 }, identity);
-  const next = inventory.accept('availability', { ...data.availability, timestamp: 2000, seatmapVersion: 8 }, identity);
+  assert.equal(inventory.accept('availability', { ...data.availability, timestamp: 2000, seatmapVersion: 8 }, identity, 6000), null);
+  assert.equal(inventory.accept('availability', { ...data.availability, timestamp: 1900, seatmapVersion: 8 }, identity, 7000), null);
+  assert.equal(inventory.accept('seatmap', { ...data.seatmap, seatmapVersion: 8 }, identity, 8000), null);
+  const next = inventory.accept('mapping', { ...data.mapping, seatmapVersion: 8 }, identity, 9000);
+  assert.equal(next.checkedAt, 6000);
+  assert.equal(next.timestamp, 2000);
   const tracker = new Tracker(); tracker.update(snapshot);
   assert.equal(tracker.update(next).baseline, true);
   assert.equal(tracker.update({ ...next, timestamp: 1500 }), null);

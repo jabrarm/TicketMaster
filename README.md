@@ -1,16 +1,18 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.4.4
+# TicketMaster · Verfügbarkeit und Warenkorb 1.4.5
 
 Chrome-Erweiterung (ab Chrome 116) für den regulären Werder-Einzelkartenshop und den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine bestätigte Auswahl an den jeweils richtigen Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
 1. Das ZIP der aktuellen Version unter `dist/` herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.4**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.5**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
 3. Den gewünschten Saalplan im [regulären Einzelkartenshop](https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382) oder im [Hospitality-Shop](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) öffnen. Nach Installation oder Update die Ticketseite neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen. Für eine andere Veranstaltung oder einen anderen Shop einen neuen Tab verwenden.
-4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
+4. Auf der Eventseite bleiben. Der Monitor öffnet den Saalplan bei Bedarf über **Jetzt Plätze auswählen**.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
 6. **Aktualisierung alle (Sekunden)** einstellen: 0,5–120 Sekunden in Halbschritten, Standard 20. Für die Automatik **Anzahl Tickets** von 1 bis 6 einstellen. Kategorien über die Gruppen-Häkchen komplett auswählen, Unterkategorien bei Bedarf abwählen und Gruppen sowie Unterkategorien mit **↑ / ↓** sortieren. Oben steht die höchste Präferenz. Über das Dreieck lassen sich Unterkategorien ein- und ausklappen.
 7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
+
+**Neu in 1.4.5:** Beim Start auf der Eventseite öffnet der Monitor den Saalplan über den normalen Shop-Button. Für eine laufende automatische Suche funktioniert das auch nach einem manuellen Seitenreload im selben Tab. Die Erweiterung markiert Antworten mit unverändertem Zeitstempel und Sitzbestand entsprechend. Treffen die drei Saalplan-Datensätze in anderer Reihenfolge ein, verarbeitet sie einen vollständigen passenden Stand sofort. Bereits dekodierte Kartengeometrie und Preiszuordnungen kann sie bei reinen Verfügbarkeitsupdates wiederverwenden.
 
 **Neu in 1.4.4:** Unter **Platzwahl** stehen **Nach meinen Präferenzen** und **Ohne Präferenzen – erste freie Plätze** zur Auswahl. Ohne Präferenzen nimmt die Automatik die ersten freien Sitzangebote in der Reihenfolge der Shopdaten, bis zur eingestellten Restmenge. Alle gemeldeten Preiskategorien kommen infrage, und mehrere Plätze können getrennt liegen. Jeder Platz wird weiterhin durch den Shop bestätigt. Beim Zurückwechseln stehen die gespeicherten Präferenzen wieder zur Verfügung.
 

@@ -1,9 +1,9 @@
 (() => {
   'use strict';
   function createTracker(now = Date.now) {
-    const active = new Set(); let failures = 0, retryUntil = 0, lastStatus = null, sequence = 0;
+    const active = new Set(); let failures = 0, retryUntil = 0, lastStatus = null, sequence = 0, availabilityRequests = 0;
     return {
-      begin(target) { active.add(target); },
+      begin(target) { active.add(target); if (target.kind === 'availability') availabilityRequests++; },
       end(target, status, retryAfter) {
         if (!active.delete(target) || target.sequence < sequence) return;
         sequence = target.sequence; lastStatus = status;
@@ -14,7 +14,7 @@
         const backoff = Math.min(60000, 2000 * 2 ** Math.min(failures, 5));
         retryUntil = Math.max(retryUntil, now() + Math.max(backoff, status === 429 ? 30000 : 0, Number.isFinite(delay) ? delay : 0));
       },
-      state: () => ({ active: active.size, failures, retryUntil, lastStatus })
+      state: () => ({ active: active.size, failures, retryUntil, lastStatus, availabilityRequests })
     };
   }
   const preferences = () => typeof window === 'undefined' && typeof module !== 'undefined' && module.exports ? require('./preferences.js') : globalThis.TicketPreferences;
@@ -27,7 +27,13 @@
       if (value < revision) return false;
       revision = value; return true;
     };
-    let lastMessage;
+    let lastMessage, shouldOpenMap = false;
+    function openMapIfReady() {
+      if (!shouldOpenMap) return;
+      if (env.client()?.isSeatmapLoaded?.()) { shouldOpenMap = false; return; }
+      const { active, retryUntil } = env.state();
+      if (!active && !(retryUntil > now()) && env.openMap?.()) shouldOpenMap = false;
+    }
     const emit = message => {
       if (message === lastMessage) return;
       lastMessage = message;
@@ -58,19 +64,22 @@
       if (now() < nextAllowed) return;
       lastStarted = now(); nextAllowed = lastStarted + seconds * 1000; busy = true;
       try {
-        emit('Aktualisierung alle ' + displaySeconds() + ' Sekunden über den normalen Shop-Ablauf.');
         await Reflect.apply(original, bound, args);
+        if (!running) return;
+        emit(env.state().availabilityRequests !== state.availabilityRequests
+          ? 'Shop-Aktualisierung ausgelöst · eingestelltes Intervall ' + displaySeconds() + ' Sekunden.'
+          : 'Shop-Aktualisierung aufgerufen; bisher keine neue Verfügbarkeitsanfrage beobachtet.');
       } catch {
         retryAt = now() + 30000; emit('Aktualisierung fehlgeschlagen; nächster Versuch frühestens in 30 Sekunden.');
       } finally { busy = false; }
     }
     function tick() {
       if (!running) return;
-      timer = null; void trigger(); if (running) timer = schedule(tick, seconds * 1000);
+      timer = null; openMapIfReady(); void trigger(); if (running) timer = schedule(tick, seconds * 1000);
     }
     return {
-      version: '1.4.4',
-      start(value, commandRevision) {
+      version: '1.4.5',
+      start(value, commandRevision, openMap = false) {
         if (!preferences().validRefreshSeconds(value)) throw new Error('Das Abfrageintervall muss in Halbschritten zwischen 0,5 und 120 Sekunden liegen.');
         if (!acceptRevision(commandRevision)) return { running, seconds };
         seconds = value; running = true;
@@ -80,9 +89,10 @@
         if (client?.isSeatmapLoaded?.() && typeof client.refreshAvailability === 'function') attach(client);
         timer = schedule(tick, seconds * 1000);
         emit('Aktualisierung alle ' + displaySeconds() + ' Sekunden. Der Shop kann unveränderte Cache-Daten liefern.');
+        if (openMap) { shouldOpenMap = true; openMapIfReady(); }
         return { running, seconds };
       },
-      stop(commandRevision) { if (!acceptRevision(commandRevision)) return { running, seconds }; running = false; if (timer !== null) unschedule(timer); timer = null; detach(); emit('Zusätzliche Aktualisierung gestoppt. Der Shop aktualisiert wieder in seinem normalen Takt.'); return { running, seconds }; },
+      stop(commandRevision) { if (!acceptRevision(commandRevision)) return { running, seconds }; running = false; shouldOpenMap = false; if (timer !== null) unschedule(timer); timer = null; detach(); emit('Zusätzliche Aktualisierung gestoppt. Der Shop aktualisiert wieder in seinem normalen Takt.'); return { running, seconds }; },
       state: () => ({ running, seconds, busy })
     };
   }
@@ -91,6 +101,12 @@
   globalThis.TicketRefreshTools = { createTracker, createController };
   globalThis.TicketRefresh = createController({
     client: () => { try { return typeof sms !== 'undefined' ? sms : null; } catch { return null; } },
+    openMap: () => {
+      const button = document.querySelector('#choose-seat-button');
+      if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || !button.getClientRects().length) return false;
+      button.click();
+      return true;
+    },
     state: () => globalThis.TicketDataObserver?.getRequestState?.() || { active: 1, retryUntil: 0 },
     selectionBusy: () => globalThis.TicketCartFlow?.isBusy?.() || false,
     emit: state => window.postMessage({ channel: 'ticket-data-monitor-v1', type: 'refresh-state', ...state }, location.origin)
