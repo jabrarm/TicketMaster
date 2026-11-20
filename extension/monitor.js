@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  if (window.__ticketDataMonitor) return;
+  if (window.__ticketDataMonitor || !globalThis.TicketPreferences || !globalThis.TicketAvailability ||
+      !globalThis.TicketPreferencePanel) return;
   const channel = 'ticket-data-monitor-v1', { Tracker, eventId } = globalThis.TicketAvailability;
   const tracker = new Tracker();
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
@@ -56,7 +57,8 @@
       fieldset{border:1px solid #395346;border-radius:10px;margin:14px 0;padding:12px}legend{font-weight:650}input[type=number]{width:65px;padding:6px;background:#203d30;color:inherit;border:1px solid #638472;border-radius:6px}input[type=checkbox]{accent-color:#b5e5ba}.checkline{display:flex;align-items:center;gap:8px;margin:7px 0;flex:1}.prefgroup{border-top:1px solid #395346;padding:8px 0}.prefgroup summary{display:flex;gap:4px;align-items:center;cursor:pointer}.prefgroup summary::before{content:'▸'}.prefgroup[open]>summary::before{content:'▾'}.prefchild{display:flex;gap:4px;align-items:center;padding-left:14px;font-size:12px}.order{padding:3px 7px}summary:focus-visible{outline:2px solid #b5e5ba}#cart-status{padding:10px;border:1px solid #638472;border-radius:8px}
     </style><section aria-label="Ticket-Verfügbarkeit"><header><div><h1>Ticket-Verfügbarkeit</h1><span class="muted">Shopdaten · ohne Farberkennung</span></div><button class="close" aria-label="Schließen">×</button></header><main>
       <div class="controls"><button id="start" class="primary">Überwachung starten</button><button id="stop" disabled>Stoppen</button></div>
-      <p id="session-status" role="status" aria-live="polite"></p><button id="session-check">Anmeldung prüfen</button>
+      <p id="session-status" role="status" aria-live="polite"></p><div class="controls"><button id="session-check">Anmeldung prüfen</button><button id="sound-test">Warenkorbton testen</button></div>
+      <p id="sound-status" class="muted" role="status"></p>
       <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p><p id="refresh-status" class="muted" role="status"></p>
       <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
       <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
@@ -70,6 +72,17 @@
     ui.querySelector('#start').onclick = () => start();
     ui.querySelector('#stop').onclick = () => stop();
     ui.querySelector('#session-check').onclick = () => void checkSession(true);
+    const soundTest = ui.querySelector('#sound-test'), soundStatus = ui.querySelector('#sound-status');
+    soundTest.onclick = async () => {
+      soundTest.disabled = true;
+      soundStatus.textContent = 'Warenkorbton wird getestet …';
+      try {
+        const result = await chrome.runtime.sendMessage({ type: 'soundTest' });
+        if (!result?.playing) throw new Error(result?.error || 'Keine Antwort von der Tonausgabe.');
+        soundStatus.textContent = 'Chrome hat die Wiedergabe gestartet.';
+      } catch (error) { soundStatus.textContent = 'Ton fehlgeschlagen. ' + error.message; }
+      finally { soundTest.disabled = false; }
+    };
     ui.querySelector('#block').onchange = render;
     preferences = globalThis.TicketPreferencePanel.create(ui.querySelector('#preferences'), value => {
       const interval = config.refreshSeconds ?? 20; config = value;
@@ -163,6 +176,7 @@
     sessionStatus.classList.toggle('error', blocked);
     sessionStatus.textContent = supported ? (session ? sessionLabels[session.state] + ' · ' + clock(session.checkedAt) : 'Anmeldung noch nicht geprüft.') : '';
     ui.querySelector('#session-check').hidden = !supported;
+    ui.querySelector('#sound-test').hidden = !supported;
     ui.querySelector('#session-check').disabled = sessionBusy;
     ui.querySelector('#cart-status').textContent = cartMessage || 'Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.';
     ui.querySelector('#refresh-status').textContent = refreshMessage;
@@ -203,7 +217,11 @@
   window.addEventListener('message', event => {
     if (!running || event.source !== window || event.origin !== location.origin || event.data?.channel !== channel) return;
     const data = event.data;
-    if (data.type === 'refresh-state') { refreshMessage = String(data.message || '').slice(0, 300); render(); return; }
+    if (data.type === 'refresh-state') {
+      const message = String(data.message || '').slice(0, 300);
+      if (message !== refreshMessage) { refreshMessage = message; ui.querySelector('#refresh-status').textContent = message; }
+      return;
+    }
     if (data.type === 'error' || data.type === 'waiting') { error = String(data.message).slice(0, 300); render(); void maybeCart(); return; }
     if (data.type !== 'snapshot') return;
     const s = data.snapshot;

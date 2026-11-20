@@ -18,9 +18,10 @@
   ];
   const allIds = catalog.flatMap(g => g.children.map(c => c.id));
   function defaults() { return { quantity: 1, adjacent: true, refreshSeconds: 20, groups: catalog.map(g => ({ id: g.id, children: g.children.map(c => ({ id: c.id, enabled: true })) })) }; }
+  const validRefreshSeconds = value => Number.isInteger(value * 2) && value >= 0.5 && value <= 120 && typeof value === 'number';
   function validate(config) {
     if (!config || !Number.isInteger(config.quantity) || config.quantity < 1 || config.quantity > 6 || typeof config.adjacent !== 'boolean' || !Array.isArray(config.groups) || config.groups.length !== catalog.length) throw new Error('Bitte 1 bis 6 Tickets und gültige Kategorien auswählen.');
-    if (config.refreshSeconds !== undefined && (!Number.isInteger(config.refreshSeconds) || config.refreshSeconds < 2 || config.refreshSeconds > 120)) throw new Error('Das Abfrageintervall muss zwischen 2 und 120 Sekunden liegen.');
+    if (config.refreshSeconds !== undefined && !validRefreshSeconds(config.refreshSeconds)) throw new Error('Das Abfrageintervall muss in Halbschritten zwischen 0,5 und 120 Sekunden liegen.');
     const groupIds = new Set(), children = new Set();
     for (const group of config.groups) {
       const template = catalog.find(g => g.id === group.id);
@@ -124,7 +125,7 @@
     const ranks = rank(config), excluded = new Set(secured.map(s => Number(s.id)));
     return snapshot.seats.some(seat => !excluded.has(seat.id) && ranks.has(match(seat)));
   }
-  const api = { version: '1.4.2', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  const api = { version: '1.4.3', validRefreshSeconds, catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
+  if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

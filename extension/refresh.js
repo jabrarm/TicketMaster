@@ -17,6 +17,7 @@
       state: () => ({ active: active.size, failures, retryUntil, lastStatus })
     };
   }
+  const preferences = () => typeof window === 'undefined' && typeof module !== 'undefined' && module.exports ? require('./preferences.js') : globalThis.TicketPreferences;
   function createController(env) {
     const now = env.now || Date.now, schedule = env.schedule || setTimeout, unschedule = env.unschedule || clearTimeout;
     let running = false, seconds = 20, timer = null, bound = null, original = null, wrapper = null, owned = false, busy = false, nextAllowed = 0, lastStarted = null, retryAt = 0, revision = -Infinity;
@@ -26,7 +27,13 @@
       if (value < revision) return false;
       revision = value; return true;
     };
-    const emit = message => env.emit?.({ running, seconds, message });
+    let lastMessage;
+    const emit = message => {
+      if (message === lastMessage) return;
+      lastMessage = message;
+      env.emit?.({ running, seconds, message });
+    };
+    const displaySeconds = () => String(seconds).replace('.', ',');
     function detach() {
       if (bound?.refreshAvailability === wrapper) {
         if (owned) bound.refreshAvailability = original; else delete bound.refreshAvailability;
@@ -51,7 +58,7 @@
       if (now() < nextAllowed) return;
       lastStarted = now(); nextAllowed = lastStarted + seconds * 1000; busy = true;
       try {
-        emit('Aktualisierung alle ' + seconds + ' Sekunden über den normalen Shop-Ablauf.');
+        emit('Aktualisierung alle ' + displaySeconds() + ' Sekunden über den normalen Shop-Ablauf.');
         await Reflect.apply(original, bound, args);
       } catch {
         retryAt = now() + 30000; emit('Aktualisierung fehlgeschlagen; nächster Versuch frühestens in 30 Sekunden.');
@@ -62,9 +69,9 @@
       timer = null; void trigger(); if (running) timer = schedule(tick, seconds * 1000);
     }
     return {
-      version: '1.4.2',
+      version: '1.4.3',
       start(value, commandRevision) {
-        if (!Number.isInteger(value) || value < 2 || value > 120) throw new Error('Das Abfrageintervall muss zwischen 2 und 120 Sekunden liegen.');
+        if (!preferences().validRefreshSeconds(value)) throw new Error('Das Abfrageintervall muss in Halbschritten zwischen 0,5 und 120 Sekunden liegen.');
         if (!acceptRevision(commandRevision)) return { running, seconds };
         seconds = value; running = true;
         nextAllowed = lastStarted === null ? 0 : lastStarted + seconds * 1000;
@@ -72,14 +79,14 @@
         const client = env.client();
         if (client?.isSeatmapLoaded?.() && typeof client.refreshAvailability === 'function') attach(client);
         timer = schedule(tick, seconds * 1000);
-        emit('Aktualisierung alle ' + seconds + ' Sekunden. Der Shop kann unveränderte Cache-Daten liefern.');
+        emit('Aktualisierung alle ' + displaySeconds() + ' Sekunden. Der Shop kann unveränderte Cache-Daten liefern.');
         return { running, seconds };
       },
       stop(commandRevision) { if (!acceptRevision(commandRevision)) return { running, seconds }; running = false; if (timer !== null) unschedule(timer); timer = null; detach(); emit('Zusätzliche Aktualisierung gestoppt. Der Shop aktualisiert wieder in seinem normalen Takt.'); return { running, seconds }; },
       state: () => ({ running, seconds, busy })
     };
   }
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { createTracker, createController }; return; }
+  if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) { module.exports = { createTracker, createController }; return; }
   if (globalThis.TicketRefresh) return;
   globalThis.TicketRefreshTools = { createTracker, createController };
   globalThis.TicketRefresh = createController({

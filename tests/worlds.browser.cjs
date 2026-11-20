@@ -52,6 +52,10 @@ async function setup(browser, legacy) {
     // Represents the old MAIN globals left alive by an extension-only update.
     await evaluate(`window.oldStarts=0;window.__ticketDataObserver=true;window.TicketCartFlow={version:'1.1.1',start:async()=>{window.oldStarts++;throw new Error('Noch nicht genügend aktuelle, passende Plätze verfügbar.');},cancel:()=>({stage:'stopped'})};`);
   } else {
+    // An unrelated page CommonJS global must not swallow extension modules.
+    await evaluate('window.module = { exports: {} };');
+    // Preferences UI may have been injected before its data module.
+    await evaluate(source('preferences-ui.js'), 'ISOLATED');
     // The observer receives the full inventory before the cart module exists.
     await evaluate(['availability-core.js', 'preferences.js', 'refresh.js', 'page-observer.js'].map(source).join('\n'));
     for (const kind of ['seatmap', 'mapping', 'availability']) await page.evaluate(async url => (await fetch(url)).json(), `https://public-api.eventim.com/seatmap/api/public/${kind}/${identity}`);
@@ -86,7 +90,7 @@ async function setup(browser, legacy) {
     assert.deepEqual(await current.page.evaluate(() => window.selected.map(s => s.id)), ['s1001']);
     assert.equal(await current.page.evaluate(() => window.TicketRefresh.state().running), true);
     assert.equal(current.commands.filter(c => c === 'cartStart').length, 1);
-    console.log('PASS: real MAIN and ISOLATED worlds exchange messages through the actual background handler; a late-created cart controller reads the observer inventory and completes confirmed selection exactly once');
+    console.log('PASS: real MAIN and ISOLATED worlds exchange messages through the actual background handler; early UI injection and a page CommonJS global do not block initialization or confirmed selection');
     await current.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

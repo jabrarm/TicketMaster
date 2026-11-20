@@ -1,5 +1,6 @@
 importScripts('availability-core.js', 'cart-session.js');
 let goalStore, openingAudio;
+const stopRequests = new Map();
 const audioDocument = 'audio.html';
 async function playSound(sound) {
   const documentUrl = chrome.runtime.getURL(audioDocument);
@@ -12,10 +13,16 @@ async function playSound(sound) {
     await openingAudio;
   }
   const response = await chrome.runtime.sendMessage({ target: 'ticket-audio', sound });
-  if (response?.error) throw new Error(response.error);
+  if (!response?.playing) throw new Error(response?.error || 'Die Tonausgabe wurde von Chrome nicht bestätigt.');
 }
-function notifySound(sound) {
-  void playSound(sound).catch(error => console.warn('Ticket-Ton konnte nicht abgespielt werden:', error.message));
+function notifySound(sound, tabId) {
+  void playSound(sound).catch(async error => {
+    console.warn('Ticket-Ton konnte nicht abgespielt werden:', error.message);
+    if (sound === 'horn') {
+      await chrome.action.setBadgeText({ tabId, text: '♪!' });
+      await chrome.action.setTitle({ tabId, title: 'Warenkorb bestätigt. Ton fehlgeschlagen: ' + error.message });
+    }
+  }).catch(() => {});
 }
 const goals = () => goalStore ||= new TicketGoalSessions.Sessions({
   read: async key => (await chrome.storage.session.get(key))[key] || null,
@@ -28,7 +35,7 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.2' || globalThis.TicketDataObserver?.version !== '1.4.2' || globalThis.TicketPreferences?.version !== '1.4.2' || globalThis.TicketRefresh?.version !== '1.4.2') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.4.3' || globalThis.TicketDataObserver?.version !== '1.4.3' || globalThis.TicketPreferences?.version !== '1.4.3' || globalThis.TicketRefresh?.version !== '1.4.3') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'refreshStart') return globalThis.TicketRefresh.start(config.seconds, config.revision);
         if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
         if (operation === 'session') return { session: await globalThis.TicketCartReceipt.checkSession() };
@@ -63,7 +70,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.2']
+      args: ['1.4.3']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -72,7 +79,7 @@ chrome.action.onClicked.addListener(async tab => {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
       func: status => {
-        if (status?.requiresReload) {
+        if (status?.requiresReload || !window.__ticketDataMonitor) {
           document.getElementById('ticket-data-monitor')?.remove();
           document.getElementById('ticket-update-notice')?.remove();
           const host = document.createElement('div'); host.id = 'ticket-update-notice';
@@ -80,7 +87,10 @@ chrome.action.onClicked.addListener(async tab => {
           const root = host.attachShadow({ mode: 'open' });
           const box = document.createElement('section'); box.style.cssText = 'font:15px/1.5 system-ui;background:#12261f;color:#eaf1ed;padding:22px;border:1px solid #638472;border-radius:14px;box-shadow:0 12px 60px #0007';
           const title = document.createElement('strong'); title.textContent = 'Update erkannt – Ticketseite neu laden';
-          const message = document.createElement('p'); message.textContent = 'In diesem Tab läuft noch älterer Auswahlcode. Das Erweiterungsupdate allein ersetzt ihn nicht. Lade die Ticketseite neu, öffne den Saalplan und starte danach die Automatik. Deine Präferenzen bleiben gespeichert.';
+          const message = document.createElement('p');
+          message.textContent = status?.requiresReload
+            ? 'In diesem Tab läuft noch ein älterer Auswahlcode. Lade die Ticketseite neu und öffne den Saalplan. Deine Präferenzen bleiben gespeichert.'
+            : 'Ein Modul für den Monitor konnte nicht geladen werden. Lade die Ticketseite neu und öffne den Saalplan. Deine Präferenzen bleiben gespeichert.';
           const button = document.createElement('button'); button.textContent = 'Ticketseite neu laden';
           button.style.cssText = 'font:inherit;padding:10px 15px;border:0;border-radius:8px;background:#b5e5ba;color:#12261f;cursor:pointer';
           button.onclick = async () => {
@@ -90,7 +100,6 @@ chrome.action.onClicked.addListener(async tab => {
           };
           box.append(title, message, button); root.append(box); (document.body || document.documentElement).append(host); return;
         }
-        if (!window.__ticketDataMonitor) throw new Error('Das Monitor-Skript konnte nicht initialisiert werden.');
         window.dispatchEvent(new CustomEvent('ticket-data-monitor-toggle'));
       },
       args: [inspection?.result]
@@ -106,14 +115,18 @@ chrome.action.onClicked.addListener(async tab => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck'].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message?.type)) return;
   const tabId = sender.tab.id;
   let url; try { url = new URL(sender.url); } catch { return; }
   if (url.origin !== 'https://www.ticket-onlineshop.com') return;
   const context = TicketAvailability.shop(url.href), eventPage = context?.type === 'event', cartPage = context?.type === 'cart';
   if (!eventPage && !cartPage) return;
-  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck'].includes(message.type) && !eventPage) return;
+  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing', 'sessionCheck', 'soundTest'].includes(message.type) && !eventPage) return;
+  const stopKey = tabId + ':' + message.goalId;
+  const stopping = message.type === 'goalStop';
+  if (stopping) stopRequests.set(stopKey, (stopRequests.get(stopKey) || 0) + 1);
   (async () => {
+    if (message.type === 'soundTest') { await playSound('horn'); return { playing: true }; }
     if (message.type === 'sessionCheck') return await invokeCart(tabId, 'session');
     if (message.type === 'availabilityPing') { notifySound('ping'); return {}; }
     if (message.type === 'cartReload') { await chrome.tabs.reload(tabId); return { stage: 'reloading' }; }
@@ -139,7 +152,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       let accepted = false;
       const confirmed = await goals().confirm(tabId, goal.id, message.receipt, () => {
         accepted = true;
-        notifySound('horn');
+        notifySound('horn', tabId);
       });
       if (accepted && confirmed.status === 'watching') await chrome.tabs.update(tabId, { url: confirmed.eventUrl });
       return { goal: confirmed };
@@ -159,8 +172,14 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const result = await invokeCart(tabId, 'prepare', config, message.run, attempt.secured);
       if (result.error) throw Object.assign(new Error(result.error), { session: result.session });
       const ready = await goals().prepared(tabId, goal.id, message.run, result);
-      if ((await goals().get(tabId)).status !== 'submitting') throw new Error('Suche gestoppt.');
-      // Persist before the native form click: it can navigate away immediately.
+      // A stop received during the write takes precedence over the form click.
+      if (stopRequests.has(stopKey)) {
+        const error = 'Suche gestoppt.';
+        await goals().pauseBeforeClick(tabId, goal.id, message.run, error);
+        await invokeCart(tabId, 'cancel', null, message.run).catch(() => {});
+        return { stage: 'error', error };
+      }
+      // The pending batch is already persisted, including across navigation.
       let submitted;
       try { submitted = await invokeCart(tabId, 'submit', null, message.run); }
       catch { return { stage: 'awaitingCart', count: ready.pending.count, goal: ready }; }
@@ -175,6 +194,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       await invokeCart(tabId, 'cancel', null, message.run).catch(() => {});
       throw error;
     }
-  })().then(respond, error => respond({ stage: 'error', error: error.message, ...(error.session && { session: error.session }) }));
+  })().then(respond, error => respond({ stage: 'error', error: error.message, ...(error.session && { session: error.session }) })).finally(() => {
+    if (!stopping) return;
+    const remaining = stopRequests.get(stopKey) - 1;
+    if (remaining) stopRequests.set(stopKey, remaining);
+    else stopRequests.delete(stopKey);
+  });
   return true;
 });

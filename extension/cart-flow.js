@@ -42,12 +42,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.2',
+      version: '1.4.3',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.2', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.3', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {
@@ -94,9 +94,11 @@
             const expected = [...run.selected, 's' + seat.id];
             if (!exact(ids(selection.getSelectedSeats()), run.selected)) throw new Error('Die Platzauswahl wurde zwischenzeitlich verändert. Automatik angehalten.');
             client.selectById('s' + seat.id);
+            const isFinalSeat = expected.length === plan.seats.length;
             await until(run, () => {
               if (selection.getLostSeatAmount?.() > 0) throw new Error('Der Shop meldet verlorene Plätze. Kein Warenkorbklick.');
-              return exact(ids(selection.getSelectedSeats()), expected) && env.cardReady('s' + seat.id);
+              return exact(ids(selection.getSelectedSeats()), expected) && env.cardReady('s' + seat.id) &&
+                (!isFinalSeat || env.buttonReady(button));
             });
             run.selected = expected;
           }
@@ -131,7 +133,7 @@
     };
     return api;
   }
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { createController }; return; }
+  if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) { module.exports = { createController }; return; }
   if (globalThis.TicketCartFlow) return;
   const eventId = () => globalThis.TicketAvailability.eventId(location.href);
   globalThis.TicketCartFlow = createController({
@@ -155,7 +157,7 @@
     watchSelection: inspect => {
       const observer = new MutationObserver(inspect);
       observer.observe(document.querySelector('#seatCardForm') || document.documentElement, {
-        subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-seat-identifier']
+        subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-seat-identifier', 'disabled', 'aria-disabled', 'style', 'hidden']
       });
       return () => observer.disconnect();
     },

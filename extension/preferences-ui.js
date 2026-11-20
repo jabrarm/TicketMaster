@@ -1,7 +1,7 @@
 (() => {
   if (globalThis.TicketPreferencePanel) return;
-  const { catalog, defaults, validate, match } = globalThis.TicketPreferences;
   const create = (container, changed) => {
+    const { catalog, defaults, validate, match, validRefreshSeconds } = globalThis.TicketPreferences;
     let config = defaults(), locked = false, touched = false, snapshot = null;
     const opened = new Set(['vip']);
     const node = (tag, value, parent) => { const el = document.createElement(tag); if (value != null) el.textContent = value; parent?.append(el); return el; };
@@ -31,9 +31,9 @@
       const amount = node('input', null, amountLabel); amount.type = 'number'; amount.min = '1'; amount.max = '6'; amount.step = '1'; amount.value = config.quantity; amount.setAttribute('aria-label', 'Anzahl Tickets');
       amount.onchange = () => { const value = Number(amount.value); if (!Number.isInteger(value) || value < 1 || value > 6) { amount.value = config.quantity; return; } config.quantity = value; update(); };
       const intervalLabel = node('label', 'Aktualisierung alle (Sekunden) ', field);
-      const interval = node('input', null, intervalLabel); interval.type = 'number'; interval.min = '2'; interval.max = '120'; interval.step = '1'; interval.value = config.refreshSeconds ?? 20; interval.setAttribute('aria-label', 'Abfrageintervall in Sekunden');
-      interval.onchange = () => { const value = Number(interval.value); if (!Number.isInteger(value) || value < 2 || value > 120) { interval.value = config.refreshSeconds ?? 20; return; } config.refreshSeconds = value; update(); };
-      const frequencyHelp = node('p', '2–120 Sekunden, Standard 20. Langsame Anfragen und Shop-Pausen verlängern den Abstand. Häufigere Abfragen garantieren keine frischeren Daten.', field); frequencyHelp.className = 'muted';
+      const interval = node('input', null, intervalLabel); interval.type = 'number'; interval.min = '0.5'; interval.max = '120'; interval.step = '0.5'; interval.value = config.refreshSeconds ?? 20; interval.setAttribute('aria-label', 'Abfrageintervall in Sekunden');
+      interval.onchange = () => { const value = Number(interval.value); if (!validRefreshSeconds(value)) { interval.value = config.refreshSeconds ?? 20; return; } config.refreshSeconds = value; update(); };
+      const frequencyHelp = node('p', '0,5–120 Sekunden, Standard 20. Langsame Anfragen und Shop-Pausen verlängern den Abstand. Häufigere Abfragen garantieren keine frischeren Daten.', field); frequencyHelp.className = 'muted';
       const adjacencyLabel = node('label', null, field); adjacencyLabel.className = 'checkline';
       const adjacency = node('input', null, adjacencyLabel); adjacency.type = 'checkbox'; adjacency.checked = config.adjacent;
       node('span', 'Nebeneinander bevorzugen; sonst nach Kategoriepräferenz', adjacencyLabel);

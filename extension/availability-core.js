@@ -24,7 +24,7 @@
       const basePath = ['/ols/werderbremen-hospitality/de/tageskarte/channel/shop/', '/ols/werderbremen/de/einzelkarten/channel/shop/'].find(base => u.pathname.startsWith(base));
       if (!basePath) return null;
       const tail = u.pathname.slice(basePath.length), id = tail.match(/^areaplan\/venue\/event\/(\d+)\/?$/)?.[1] || null;
-      return { basePath, baseUrl: u.origin + basePath, type: id ? 'event' : /^shoppingcart\/?$/.test(tail) ? 'cart' : 'other',
+      return { basePath, baseUrl: u.origin + basePath, type: id ? 'event' : /^shoppingcart(?:\/index)?\/?$/.test(tail) ? 'cart' : 'other',
         eventId: id, eventUrl: id ? u.origin + basePath + 'areaplan/venue/event/' + id : null,
         cartUrl: u.origin + basePath + 'shoppingcart', kind: basePath.includes('werderbremen-hospitality') ? 'hospitality' : 'regular' };
     } catch { return null; }
@@ -123,6 +123,6 @@
     }
   }
   const api = { shop, eventId, endpoint, Inventory, Tracker };
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketAvailability = api;
 })();

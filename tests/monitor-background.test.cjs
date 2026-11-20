@@ -44,3 +44,50 @@ test('blocked script injection shows a visible badge and exposes the cause in th
   assert.equal(badges[0].text, '!');
   assert.match(titles[0].title, /Seitenzugriff verweigert/);
 });
+test('a stop received while the pending handoff is written prevents the native form click', async () => {
+  const { Sessions } = require('../extension/cart-session.js');
+  const prefs = require('../extension/preferences.js');
+  const event = 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382';
+  let handle, hold, ready, submitCalls = 0;
+  const writing = new Promise(resolve => { ready = resolve; });
+  const release = new Promise(resolve => { hold = resolve; });
+  let stored;
+  const storage = {
+    get: async key => ({ [key]: structuredClone(stored) }),
+    set: async value => {
+      const incoming = Object.values(value)[0];
+      if (incoming.status === 'submitting') { ready(); await release; }
+      stored = structuredClone(incoming);
+    }
+  };
+  const goalStore = new Sessions({ read: async key => (await storage.get(key))[key], write: async (key, value) => storage.set({ [key]: value }) });
+  await goalStore.begin(19, 'goal-01', prefs.defaults(), event);
+  const responses = {
+    baseline: { valid: true, keys: [] },
+    prepare: { stage: 'prepared', count: 1, seats: [{ id: 123 }] },
+    cancel: { stage: 'stopped' },
+    submit: { stage: 'submitted', count: 1 }
+  };
+  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname, '../extension/background.js'), 'utf8'), {
+    URL, TicketAvailability: require('../extension/availability-core.js'), TicketGoalSessions: { Sessions }, importScripts() {}, console,
+    chrome: {
+      action: { onClicked: { addListener() {} } },
+      runtime: { id: 'test-extension', onMessage: { addListener(fn) { handle = fn; } } },
+      storage: { session: storage },
+      scripting: { executeScript: async ({ args: [op] }) => {
+        if (op === 'submit') submitCalls++;
+        return [{ result: responses[op] }];
+      } }
+    }
+  });
+  const send = msg => new Promise(resolve => handle(msg, { id: 'test-extension', tab: { id: 19 }, url: event }, resolve));
+  const running = send({ type: 'cartStart', goalId: 'goal-01', run: 'run-0001' });
+  await writing;
+  const stopped = send({ type: 'goalStop', goalId: 'goal-01' });
+  hold();
+  assert.match((await running).error, /gestoppt/);
+  await stopped;
+  assert.equal(submitCalls, 0);
+  assert.equal(stored.status, 'stopped');
+  assert.equal(stored.pending, null);
+});

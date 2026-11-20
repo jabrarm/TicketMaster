@@ -1,11 +1,32 @@
 (() => {
   if (globalThis.TicketAvailability.shop(location.href)?.type !== 'cart') return;
+  function waitForReceipt(goal) {
+    const pending = goal.pending;
+    const hasExpectedNewKeys = receipt => receipt.valid && goal.confirmed.every(key => receipt.keys.includes(key)) &&
+      receipt.keys.filter(key => !pending.baseline.includes(key)).length === pending.count;
+    const initial = TicketCartReceipt.read(document);
+    if (hasExpectedNewKeys(initial)) return Promise.resolve(initial);
+    return new Promise(resolve => {
+      const finish = receipt => {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve(receipt);
+      };
+      const observer = new MutationObserver(() => {
+        const receipt = TicketCartReceipt.read(document);
+        if (hasExpectedNewKeys(receipt)) finish(receipt);
+      });
+      const timer = setTimeout(() => finish(TicketCartReceipt.read(document)), 2500);
+      observer.observe(document.body, { subtree: true, childList: true, attributes: true,
+        attributeFilter: ['class', 'data-seat-identifier', 'data-seat-id'] });
+    });
+  }
   async function run() {
     const response = await chrome.runtime.sendMessage({ type: 'goalGet' });
     if (!response?.goal) return;
     let goal = response.goal;
     if (goal.status === 'submitting') {
-      const confirmation = await chrome.runtime.sendMessage({ type: 'goalReceipt', goalId: goal.id, receipt: TicketCartReceipt.read(document) });
+      const confirmation = await chrome.runtime.sendMessage({ type: 'goalReceipt', goalId: goal.id, receipt: await waitForReceipt(goal) });
       if (confirmation?.error) throw new Error(confirmation.error);
       goal = confirmation.goal;
     }

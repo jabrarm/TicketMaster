@@ -4,7 +4,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const { fixture } = require('./availability.fixture.cjs');
 const source = name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8');
 const base = '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
-async function setup(browser, regular = false) {
+async function setup(browser, regular = false, delayedCart = false) {
   const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
   const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
@@ -12,8 +12,18 @@ async function setup(browser, regular = false) {
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   for (const part of Object.values(data)) part.seatmapId = event;
   if (regular) for (const category of data.mapping.priceCategories) category.name = 'PK1';
-  const cartHtml = () => '<!doctype html><meta charset="utf-8"><title>Warenkorb</title>' +
-    '<header><a href="' + base + (backend.loggedIn ? 'customer/logout' : 'customer/login') + '">Konto</a></header>' + (backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) => `<li class="seat-card" data-seat-identifier="cart-${i + 1}" data-seat-id="${item}">Ticket</li>`).join('') + '</ul>' : '<div class="empty-state">Keine Tickets</div>') + '<a id="continue-shopping-button" href="' + base + 'index">Weiter einkaufen</a>';
+  const cartPath = base + (delayedCart ? 'shoppingcart/index' : 'shoppingcart');
+  const cartHtml = navigation => {
+    const cards = backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) =>
+      `<li class="seat-card" data-seat-identifier="cart-${i + 1}" data-seat-id="${item}">Ticket</li>`).join('') +
+      '</ul>' : '<div class="empty-state">Keine Tickets</div>';
+    const content = navigation && delayedCart
+      ? '<div id="delayed"></div><script>setTimeout(() => { document.querySelector("#delayed").innerHTML = ' + JSON.stringify(cards) + '; }, 250);</script>'
+      : cards;
+    return '<!doctype html><meta charset="utf-8"><title>Warenkorb</title>' +
+      '<header><a href="' + base + (backend.loggedIn ? 'customer/logout' : 'customer/login') + '">Konto</a></header>' +
+      content + '<a id="continue-shopping-button" href="' + base + 'index">Weiter einkaufen</a>';
+  };
   const eventHtml = `<!doctype html><meta charset="utf-8"><title>Test-Saalplan</title><button id="choose-seat-button">Jetzt Plätze auswählen</button>
   <form id="seatCardForm" method="post" action="${base}shoppingcart/addselecteditemsareas/event/${event}"><ul id="seat-cards-list"></ul><button id="add-to-cart" type="submit">In den Warenkorb</button></form><script>
   window.selected=[];let mapReady=false;
@@ -30,9 +40,9 @@ async function setup(browser, regular = false) {
       if (!ids.length || ids.some(id => backend.items.includes(id))) return route.fulfill({ status: 400, body: 'Duplicate or empty batch' });
       // Playwright routes only the first request of an HTTP redirect chain.
       // Use a document redirect so the cart GET stays inside this fixture too.
-      backend.items.push(...ids); return route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><script>location.replace(' + JSON.stringify(base + 'shoppingcart') + ')</script>' });
+      backend.items.push(...ids); return route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><script>location.replace(' + JSON.stringify(cartPath) + ')</script>' });
     }
-    if (url.pathname === base + 'shoppingcart') return route.fulfill({ contentType: 'text/html', body: cartHtml() });
+    if ([base + 'shoppingcart', cartPath].includes(url.pathname)) return route.fulfill({ contentType: 'text/html', body: cartHtml(request.isNavigationRequest()) });
     if (url.hostname === 'www.ticket-onlineshop.com') return route.fulfill({ contentType: 'text/html', body: eventHtml });
     const kind = url.pathname.split('/').at(-2);
     const result = kind === 'availability' ? { ...data.availability, timestamp: Date.now(), expired: true, seats: [[1001, 1], [1, backend.second ? 1 : 0], [999, 0], [1000, backend.second ? 1 : 0]] } : data[kind];
@@ -52,7 +62,7 @@ async function setup(browser, regular = false) {
       onMessage: { addListener: f => { handleMessage = f; } },
       getURL: path => 'chrome-extension://goal-test-extension/' + path,
       getContexts: async () => [{}],
-      sendMessage: async message => backend.sounds.push(message.sound)
+      sendMessage: async message => { backend.sounds.push(message.sound); return { playing: true }; }
     },
     storage: { session: { get: async key => ({ [key]: structuredClone(stored[key]) }), set: async value => { Object.assign(stored, structuredClone(value)); } } },
     tabs: { reload: async () => page.reload(), update: async (id, value) => { assert.equal(id, 19); backend.returns++; await page.goto(value.url); } },
@@ -73,7 +83,7 @@ async function setup(browser, regular = false) {
       currentContext = executionContextId; contexts.set(executionContextId, page.url());
       await cdp.send('Runtime.addBinding', { name: 'goalBridge', executionContextId });
       await evaluate(`window.__answers={};window.__n=0;window.chrome={runtime:{sendMessage:message=>new Promise(resolve=>{const id=++window.__n;window.__answers[id]=v=>{delete window.__answers[id];resolve(v);};window.goalBridge(JSON.stringify({id,message}));})},storage:{local:{get:async()=>({}),set:async()=>{}}}};`, executionContextId);
-      const cart = new URL(page.url()).pathname === base + 'shoppingcart';
+      const cart = new URL(page.url()).pathname === cartPath;
       await evaluate((cart ? ['availability-core.js', 'cart-receipt.js', 'cart-return.js'] : ['availability-core.js', 'preferences.js', 'preferences-ui.js', 'monitor.js']).map(source).join('\n'), executionContextId);
     })(); installing.catch(() => {});
   });
@@ -83,7 +93,7 @@ async function setup(browser, regular = false) {
   await click({ id: 19 });
   const panel = page.locator('#ticket-data-monitor');
   await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).dispatchEvent('change');
-  await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
+  await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('0.5'); await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
   await panel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).click();
   try { await page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#goal-progress')?.textContent.includes('1 / 2'), null, { timeout: 15000 }); }
   catch (error) {
@@ -96,8 +106,8 @@ async function setup(browser, regular = false) {
   try {
     const first = await setup(browser);
     assert.deepEqual(first.backend.posts, [[1001]]); assert.equal(first.state().confirmed.length, 1); assert.equal(first.backend.returns, 1);
-    assert.equal(first.state().config.refreshSeconds, 2);
-    assert.equal(await first.page.locator('#ticket-data-monitor').getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).inputValue(), '2');
+    assert.equal(first.state().config.refreshSeconds, 0.5);
+    assert.equal(await first.page.locator('#ticket-data-monitor').getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).inputValue(), '0.5');
     await first.page.waitForTimeout(150);
     assert.equal(first.backend.posts.length, 1, 'the still-advertised first seat must not be purchased again');
     first.backend.second = true; await first.page.evaluate(() => sms.refreshAvailability());
@@ -137,14 +147,15 @@ async function setup(browser, regular = false) {
     console.log('PASS: logout on the cart preflight stops before seat selection, rechecking login and manually restarting preserves previously confirmed tickets');
     await expired.page.close();
 
-    const regular = await setup(browser, true);
+    const regular = await setup(browser, true, true);
     assert.deepEqual(regular.backend.posts, [[1001]]);
     regular.backend.second = true; await regular.page.evaluate(() => sms.refreshAvailability());
     await regular.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
     assert.deepEqual(regular.backend.posts, [[1001], [1002]]);
-    assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart');
+    assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart/index');
     assert.equal(regular.state().eventUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382');
-    console.log('PASS: the regular Einzelkarten shop uses its own event, cart and return URLs throughout partial-ticket collection');
+    assert.deepEqual(regular.backend.sounds, ['horn', 'horn']);
+    console.log('PASS: the regular Einzelkarten shop confirms delayed cart cards on /shoppingcart/index and triggers the horn once per batch');
     await regular.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
