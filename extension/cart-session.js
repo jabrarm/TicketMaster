@@ -64,7 +64,7 @@
         await this.storage.write(this.key(tab), goal); return goal;
       });
     }
-    async confirm(tab, id, receipt, onConfirmed) {
+    async confirm(tab, id, receipt, onConfirmed, timings) {
       return this.lock(tab, async () => {
         const goal = await this.require(tab, id);
         if (goal.status !== 'submitting' || !goal.pending) return goal;
@@ -76,6 +76,9 @@
           goal.status = 'paused'; goal.message = 'Die neue Ticketanzahl im Warenkorb lässt sich nicht eindeutig bestätigen. Bitte den Warenkorb prüfen; keine automatische Wiederholung.';
         } else {
           goal.confirmed.push(...added); goal.secured.push(...goal.pending.seats); goal.pending = null;
+          const { selectionMs, handoffMs, cartMs } = timings || {};
+          goal.timings = [selectionMs, handoffMs, cartMs].every(ms => Number.isFinite(ms) && ms >= 0 && ms <= 30 * 60 * 1000)
+            ? { selectionMs, handoffMs, cartMs } : null;
           goal.status = goal.confirmed.length === goal.target ? 'completed' : 'watching';
           goal.message = goal.confirmed.length + ' von ' + goal.target + ' Tickets im Warenkorb bestätigt.';
         }

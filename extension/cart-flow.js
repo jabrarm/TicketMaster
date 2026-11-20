@@ -5,6 +5,7 @@
     const used = new Set(), cancelled = new Set();
     const wait = env.wait || (ms => new Promise(resolve => setTimeout(resolve, ms)));
     const now = env.now || Date.now;
+    const measureTime = env.measureTime || now;
     const currentSnapshot = () => env.snapshot ? env.snapshot() : snapshot;
     const check = run => { if (run.cancelled || active !== run) throw new Error('Automatik gestoppt. Bereits ausgewählte Plätze bitte im Shop prüfen.'); };
     const ids = selection => selection.map(s => String(s.id));
@@ -42,12 +43,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.6',
+      version: '1.4.7',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.6', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.7', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {
@@ -94,13 +95,20 @@
             }
             const expected = [...run.selected, 's' + seat.id];
             if (!exact(ids(selection.getSelectedSeats()), run.selected)) throw new Error('Die Platzauswahl wurde zwischenzeitlich verändert. Automatik angehalten.');
+            run.selectionStartedAt ??= measureTime();
             client.selectById('s' + seat.id);
+            let confirmedAt;
             const isFinalSeat = expected.length === plan.seats.length;
             await until(run, () => {
               if (selection.getLostSeatAmount?.() > 0) throw new Error('Der Shop meldet verlorene Plätze. Kein Warenkorbklick.');
-              return exact(ids(selection.getSelectedSeats()), expected) && env.cardReady('s' + seat.id) &&
-                (!isFinalSeat || env.buttonReady(button));
+              if (!exact(ids(selection.getSelectedSeats()), expected) || !env.cardReady('s' + seat.id)) {
+                confirmedAt = undefined;
+                return false;
+              }
+              confirmedAt ??= measureTime();
+              return !isFinalSeat || env.buttonReady(button);
             });
+            run.lastSeatConfirmedAt = confirmedAt;
             run.selected = expected;
           }
           check(run);
@@ -124,6 +132,7 @@
           if (!exact(ids(run.selection.getSelectedSeats()), run.selected) || run.selection.getLostSeatAmount?.() > 0 || !env.validForm(run.form) || !env.buttonReady(run.button)) throw new Error('Die bestätigte Platzauswahl oder der Warenkorbknopf hat sich verändert. Keine Übergabe.');
           // The background persists the pending batch before invoking this click.
           // Navigation may destroy this context; never retry an unconfirmed POST.
+          env.measureClick?.(runId, run.selectionStartedAt, run.lastSeatConfirmedAt);
           run.button.click();
           return { stage: 'submitted', ...run.result };
         } finally { if (active === run) active = null; }
@@ -140,6 +149,8 @@
   const eventId = () => globalThis.TicketAvailability.eventId(location.href);
   globalThis.TicketCartFlow = createController({
     preferences: () => globalThis.TicketPreferences,
+    measureTime: () => globalThis.TicketCartReceipt?.browserTime?.() ?? performance.now(),
+    measureClick: (...args) => globalThis.TicketCartReceipt?.measureClick?.(...args),
     checkSession: () => globalThis.TicketCartReceipt?.assertSession(),
     snapshot: () => globalThis.TicketDataObserver?.getSnapshot() || null,
     dataError: () => globalThis.TicketDataObserver?.getError(),

@@ -35,7 +35,7 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.6' || globalThis.TicketDataObserver?.version !== '1.4.6' || globalThis.TicketPreferences?.version !== '1.4.6' || globalThis.TicketRefresh?.version !== '1.4.6') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.4.7' || globalThis.TicketDataObserver?.version !== '1.4.7' || globalThis.TicketPreferences?.version !== '1.4.7' || globalThis.TicketRefresh?.version !== '1.4.7') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'refreshStart') {
           return globalThis.TicketRefresh.start(config.seconds, config.revision, config.openMap);
         }
@@ -71,7 +71,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.6']
+      args: ['1.4.7']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -154,7 +154,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const confirmed = await goals().confirm(tabId, goal.id, message.receipt, () => {
         accepted = true;
         notifySound('horn', tabId);
-      });
+      }, message.timings);
       if (accepted && confirmed.status === 'watching') await chrome.tabs.update(tabId, { url: confirmed.eventUrl });
       return { goal: confirmed };
     }

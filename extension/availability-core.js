@@ -130,7 +130,14 @@
       return { baseline, added, removed };
     }
   }
-  const api = { shop, eventId, endpoint, Inventory, Tracker };
+  function formatTimings(timings) {
+    if (!timings) return '';
+    const ms = value => value.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' ms';
+    return 'Letzte bestätigte Übergabe · Sitzwahl bis Bestätigung ' + ms(timings.selectionMs) +
+      ' · Letzte Sitzbestätigung bis Warenkorbklick ' + ms(timings.handoffMs) +
+      ' · Klick bis Anzeige im Warenkorb ' + ms(timings.cartMs);
+  }
+  const api = { shop, eventId, endpoint, Inventory, Tracker, formatTimings };
   if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketAvailability = api;
 })();

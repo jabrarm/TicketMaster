@@ -77,5 +77,31 @@
     if (!receipt?.valid) throw new Error('Der Warenkorb hat ein unbekanntes Format. Es wird nichts automatisch hinzugefügt.');
     return receipt;
   }
-  globalThis.TicketCartReceipt = { read, baseline, checkSession, assertSession };
+  const timingKey = 'ticket-monitor-handoff-timing';
+  const browserTime = () => performance.timeOrigin + performance.now();
+
+  function measureClick(runId, selectionStartedAt, lastSeatConfirmedAt) {
+    // Write on navigation so storage cannot delay the click.
+    let clickedAt;
+    window.addEventListener('pagehide', () => {
+      try {
+        sessionStorage.setItem(timingKey, JSON.stringify({
+          runId, clickedAt,
+          selectionMs: lastSeatConfirmedAt - selectionStartedAt,
+          handoffMs: clickedAt - lastSeatConfirmedAt
+        }));
+      } catch { /* Diagnostics must not affect the shop flow. */ }
+    }, { once: true });
+    clickedAt = browserTime();
+  }
+
+  function readTiming(runId, receiptAt) {
+    try {
+      const data = JSON.parse(sessionStorage.getItem(timingKey));
+      if (data?.runId !== runId) return null;
+      sessionStorage.removeItem(timingKey);
+      return { selectionMs: data.selectionMs, handoffMs: data.handoffMs, cartMs: receiptAt - data.clickedAt };
+    } catch { return null; }
+  }
+  globalThis.TicketCartReceipt = { read, baseline, checkSession, assertSession, browserTime, measureClick, readTiming };
 })();

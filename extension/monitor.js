@@ -62,7 +62,7 @@
       <p id="session-status" role="status" aria-live="polite"></p><div class="controls"><button id="session-check">Anmeldung prüfen</button><button id="sound-test">Warenkorbton testen</button></div>
       <p id="sound-status" class="muted" role="status"></p>
       <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p><p id="refresh-status" class="muted" role="status"></p>
-      <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
+      <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><p id="handoff-timing" class="muted"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
       <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
       <label>Block <select id="block" aria-label="Block filtern"><option value="">Alle Blöcke</option></select></label>
       <table><thead><tr><th>Block / Reihe</th><th>Sitz-ID</th><th>Kategorie</th></tr></thead><tbody id="seats"></tbody></table>
@@ -199,6 +199,7 @@
     ui.querySelector('#cart-status').textContent = cartMessage || 'Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.';
     ui.querySelector('#refresh-status').textContent = refreshMessage;
     ui.querySelector('#goal-progress').textContent = goal ? goal.confirmed.length + ' / ' + goal.target + ' Tickets zuletzt im Warenkorb bestätigt.' : '';
+    ui.querySelector('#handoff-timing').textContent = globalThis.TicketAvailability.formatTimings(goal?.timings);
     preferences?.snapshot(last);
     const status = ui.querySelector('#status');
     const stale = last && Date.now() - last.checkedAt > 120000;

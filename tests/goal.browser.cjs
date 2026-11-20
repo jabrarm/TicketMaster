@@ -125,6 +125,7 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     const first = await setup(browser);
     assert.deepEqual(first.backend.posts, [[1001]]); assert.equal(first.state().confirmed.length, 1); assert.equal(first.backend.returns, 1);
     assert.equal(first.state().config.refreshSeconds, 0.5);
+    assert.match(await first.page.locator('#ticket-data-monitor').locator('#handoff-timing').textContent(), /Sitzwahl bis Bestätigung .*Warenkorbklick.*Klick bis Anzeige im Warenkorb/);
     assert.equal(await first.page.locator('#ticket-data-monitor').getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).inputValue(), '0.5');
     await first.page.waitForTimeout(150);
     assert.equal(first.backend.posts.length, 1, 'the still-advertised first seat must not be purchased again');
@@ -177,6 +178,11 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart/index');
     assert.equal(regular.state().eventUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382');
     assert.deepEqual(regular.backend.sounds, ['horn', 'horn']);
+    const timing = regular.state().timings;
+    assert.ok(timing.selectionMs >= 0 && timing.handoffMs >= 0, JSON.stringify(timing));
+    assert.ok(timing.cartMs >= 200, 'the timing includes rendering of the delayed cart cards: ' + JSON.stringify(timing));
+    assert.match(await regular.page.locator('.ticket-handoff-timing').textContent(), /ms.*ms.*ms/);
+    console.log('PASS: selection, handoff and visible cart timings survive both form navigations', timing);
     console.log('PASS: monitor keeps watching when an offer vanishes before selection, then takes the next offer and resumes after navigation');
     await regular.page.close();
   } finally { await browser.close(); }

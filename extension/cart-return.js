@@ -26,7 +26,9 @@
     if (!response?.goal) return;
     let goal = response.goal;
     if (goal.status === 'submitting') {
-      const confirmation = await chrome.runtime.sendMessage({ type: 'goalReceipt', goalId: goal.id, receipt: await waitForReceipt(goal) });
+      const receipt = await waitForReceipt(goal);
+      const timings = TicketCartReceipt.readTiming(goal.pending.run, TicketCartReceipt.browserTime());
+      const confirmation = await chrome.runtime.sendMessage({ type: 'goalReceipt', goalId: goal.id, receipt, timings });
       if (confirmation?.error) throw new Error(confirmation.error);
       goal = confirmation.goal;
     }
@@ -35,6 +37,13 @@
     box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;max-width:420px;padding:18px;border-radius:12px;background:#12261f;color:#eaf1ed;font:15px/1.5 system-ui;box-shadow:0 8px 40px #0005';
     const text = document.createElement('p'); text.textContent = goal.confirmed.length + ' von ' + goal.target + ' Tickets im Warenkorb bestätigt. ' + (goal.status === 'completed' ? 'Ziel erreicht. Checkout und Zahlung erfolgen durch dich.' : goal.status === 'watching' ? 'Die Suche nach den fehlenden Tickets wird fortgesetzt.' : goal.message || 'Bitte den Warenkorb prüfen.');
     box.append(text);
+    const timing = TicketAvailability.formatTimings(goal.timings);
+    if (timing) {
+      const details = document.createElement('p');
+      details.className = 'ticket-handoff-timing';
+      details.textContent = timing;
+      box.append(details);
+    }
     if (['watching', 'preparing', 'submitting'].includes(goal.status)) {
       const stop = document.createElement('button'); stop.textContent = 'Weitere Suche stoppen';
       stop.onclick = async () => { await chrome.runtime.sendMessage({ type: 'goalStop', goalId: goal.id }); text.textContent = 'Weitere Suche gestoppt. Bereits hinzugefügte Tickets bleiben im Warenkorb.'; stop.remove(); }; box.append(stop);
