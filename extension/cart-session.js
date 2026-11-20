@@ -12,6 +12,7 @@
     async get(tab) {
       const goal = await this.storage.read(this.key(tab));
       if (goal && active.has(goal.status) && this.now() - goal.startedAt > 30 * 60 * 1000) {
+        if (goal.status === 'preparing') goal.pending = null;
         goal.status = 'paused'; goal.message = 'Die Suche ist nach 30 Minuten angehalten. Bitte Reservierungsfrist und Warenkorb prüfen.'; await this.storage.write(this.key(tab), goal);
       }
       return goal || null;
@@ -20,7 +21,7 @@
       return this.lock(tab, async () => {
         const old = await this.get(tab);
         if (old && (active.has(old.status) || old.pending)) throw new Error('In diesem Tab läuft bereits eine Suche oder eine unbestätigte Übergabe. Bitte diese zuerst stoppen und den Warenkorb prüfen.');
-        if (old && old.eventUrl === eventUrl && old.status === 'stopped') {
+        if (old && old.eventUrl === eventUrl && ['paused', 'stopped'].includes(old.status)) {
           if (config.quantity < old.confirmed.length) throw new Error('Die neue Zielanzahl ist kleiner als die bereits bestätigte Ticketanzahl. Bitte den Warenkorb prüfen.');
           old.config = config; old.target = config.quantity; old.startedAt = this.now();
           old.status = old.confirmed.length === old.target ? 'completed' : 'watching'; old.message = 'Suche mit bisher bestätigten Tickets fortgesetzt.';
@@ -53,28 +54,44 @@
         await this.storage.write(this.key(tab), goal); return goal;
       });
     }
-    async confirm(tab, id, receipt) {
+    async confirm(tab, id, receipt, onConfirmed) {
       return this.lock(tab, async () => {
         const goal = await this.require(tab, id);
         if (goal.status !== 'submitting' || !goal.pending) return goal;
         const added = receipt.valid ? receipt.keys.filter(k => !goal.pending.baseline.includes(k)) : [];
         const linkedIds = (receipt.entries || []).filter(e => added.includes(e.key) && e.seatId).map(e => String(e.seatId).replace(/^s/, ''));
         const expected = new Set(goal.pending.seats.map(s => String(s.id)));
-        if (!receipt.valid || new Set(receipt.keys).size !== receipt.keys.length || !goal.confirmed.every(k => receipt.keys.includes(k)) || added.length !== goal.pending.count || linkedIds.some(id => !expected.has(id))) {
+        const invalid = !receipt.valid || new Set(receipt.keys).size !== receipt.keys.length || !goal.confirmed.every(k => receipt.keys.includes(k)) || added.length !== goal.pending.count || linkedIds.some(id => !expected.has(id));
+        if (invalid) {
           goal.status = 'paused'; goal.message = 'Die neue Ticketanzahl im Warenkorb lässt sich nicht eindeutig bestätigen. Bitte den Warenkorb prüfen; keine automatische Wiederholung.';
         } else {
           goal.confirmed.push(...added); goal.secured.push(...goal.pending.seats); goal.pending = null;
           goal.status = goal.confirmed.length === goal.target ? 'completed' : 'watching';
           goal.message = goal.confirmed.length + ' von ' + goal.target + ' Tickets im Warenkorb bestätigt.';
         }
-        await this.storage.write(this.key(tab), goal); return goal;
+        await this.storage.write(this.key(tab), goal);
+        if (!invalid) onConfirmed?.();
+        return goal;
       });
     }
     async pause(tab, id, message) {
-      return this.lock(tab, async () => { const goal = await this.require(tab, id); if (goal.status !== 'stopped') { goal.status = 'paused'; goal.message = message; await this.storage.write(this.key(tab), goal); } return goal; });
+      return this.lock(tab, async () => {
+        const goal = await this.require(tab, id);
+        if (goal.status === 'stopped') return goal;
+        if (goal.status === 'preparing') goal.pending = null;
+        goal.status = 'paused'; goal.message = message;
+        await this.storage.write(this.key(tab), goal);
+        return goal;
+      });
     }
     async stop(tab, id) {
-      return this.lock(tab, async () => { const goal = await this.require(tab, id); goal.status = 'stopped'; goal.message = 'Suche gestoppt. Bereits übernommene Tickets bleiben im Warenkorb.'; await this.storage.write(this.key(tab), goal); return goal; });
+      return this.lock(tab, async () => {
+        const goal = await this.require(tab, id);
+        if (goal.status === 'preparing') goal.pending = null;
+        goal.status = 'stopped'; goal.message = 'Suche gestoppt. Bereits übernommene Tickets bleiben im Warenkorb.';
+        await this.storage.write(this.key(tab), goal);
+        return goal;
+      });
     }
     async require(tab, id) { const goal = await this.get(tab); if (!goal || goal.id !== id) throw new Error('Die Ticketsuche ist nicht mehr aktiv.'); return goal; }
   }

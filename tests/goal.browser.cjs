@@ -8,7 +8,7 @@ async function setup(browser, regular = false) {
   const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
   const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
-  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0 };
+  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [] };
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   for (const part of Object.values(data)) part.seatmapId = event;
   if (regular) for (const category of data.mapping.priceCategories) category.name = 'PK1';
@@ -46,7 +46,13 @@ async function setup(browser, regular = false) {
   }
   const sandbox = { console, URL, crypto: globalThis.crypto, chrome: {
     action: { onClicked: { addListener: f => { click = f; } }, setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {}, setTitle: async () => {} },
-    runtime: { id: 'goal-test-extension', onMessage: { addListener: f => { handleMessage = f; } } },
+    runtime: {
+      id: 'goal-test-extension',
+      onMessage: { addListener: f => { handleMessage = f; } },
+      getURL: path => 'chrome-extension://goal-test-extension/' + path,
+      getContexts: async () => [{}],
+      sendMessage: async message => backend.sounds.push(message.sound)
+    },
     storage: { session: { get: async key => ({ [key]: structuredClone(stored[key]) }), set: async value => { Object.assign(stored, structuredClone(value)); } } },
     tabs: { reload: async () => page.reload(), update: async (id, value) => { assert.equal(id, 19); backend.returns++; await page.goto(value.url); } },
     scripting: { executeScript: async options => [{ frameId: 0, result: await evaluate(options.files ? options.files.map(source).join('\n') : '(' + options.func.toString() + ')(...' + JSON.stringify(options.args || []) + ')', options.world === 'ISOLATED' ? currentContext : undefined) }] }
@@ -97,6 +103,7 @@ async function setup(browser, regular = false) {
     await first.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
     assert.deepEqual(first.backend.posts, [[1001], [1002]]); assert.deepEqual(first.backend.items, [1001, 1002]);
     assert.equal(first.state().status, 'completed'); assert.equal(first.backend.returns, 1);
+    assert.deepEqual(first.backend.sounds, ['horn', 'horn']);
     assert.equal(new URL(first.page.url()).pathname, base + 'shoppingcart');
     console.log('PASS: native form navigation confirms ticket 1, automatically resumes only the remainder, excludes its repeated API offer, later adds neighbouring ticket 2 and stays in the cart at 2/2');
     await first.page.close();

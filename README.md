@@ -1,16 +1,18 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.4.0
+# TicketMaster · Verfügbarkeit und Warenkorb 1.4.1
 
-Chrome-Erweiterung für den regulären Werder-Einzelkartenshop und den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine bestätigte Auswahl an den jeweils richtigen Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
+Chrome-Erweiterung (ab Chrome 116) für den regulären Werder-Einzelkartenshop und den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine bestätigte Auswahl an den jeweils richtigen Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
-1. Den Branch `availability-monitor-v1` bzw. das ZIP der aktuellen Version herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.0**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
+1. Das ZIP der aktuellen Version unter `dist/` herunterladen und entpacken.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.1**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
 3. Den gewünschten Saalplan im [regulären Einzelkartenshop](https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382) oder im [Hospitality-Shop](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) öffnen. Nach Installation oder Update die Ticketseite neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen. Für eine andere Veranstaltung oder einen anderen Shop einen neuen Tab verwenden.
 4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
 6. **Aktualisierung alle (Sekunden)** einstellen: 2–120 Sekunden, Standard 20. Für die Automatik **Anzahl Tickets** von 1 bis 6 einstellen. Kategorien über die Gruppen-Häkchen komplett auswählen, Unterkategorien bei Bedarf abwählen und Gruppen sowie Unterkategorien mit **↑ / ↓** sortieren. Oben steht die höchste Präferenz. Über das Dreieck lassen sich Unterkategorien ein- und ausklappen.
 7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
+
+**Neu in 1.4.1:** Sitzkarten werden unmittelbar nach Änderungen im Formular geprüft. Ein kurzer Ping meldet neu freie Sitze aus einer gültigen Shop-Liste. Nach einer bestätigten Warenkorbzugabe ertönt ein Nebelhorn. Standardmäßig wird der Hornklang synthetisch erzeugt. Unter **Erweiterungsoptionen → Warenkorbton** lässt sich eine eigene Weserstadion-Aufnahme auswählen. Die Datei bleibt lokal im Browser.
 
 **Neu in 1.2.0:** Ist beispielsweise das Ziel **2 Tickets**, aber nur **1 passender Platz** verfügbar, wird dieser sofort einzeln ausgewählt und an den Warenkorb übergeben. Erst die Warenkorbseite bestätigt den Fortschritt **1/2**. Danach kehrt die Erweiterung automatisch zu derselben Ticketseite zurück, öffnet den Saalplan und sucht nur das noch fehlende Ticket. Bei **2/2** bleibt sie im Warenkorb. Checkout und Zahlung erfolgen manuell. Die Reservierungsfrist des Shops läuft während der weiteren Suche weiter.
 
@@ -56,7 +58,7 @@ Die Automatik wählt die aktuell verfügbare Teilmenge, maximal die noch fehlend
 
 Auf der Warenkorbseite wird geprüft, welche Ticket-Einträge gegenüber dem vorherigen Stand hinzugekommen sind. Nur bei einer eindeutigen Bestätigung wird die Teilmenge auf das Suchziel angerechnet. Vorhandene Warenkorbtickets werden nicht als neue Tickets gezählt. Bereits übernommene Sitz-IDs werden bei späteren Angeboten ausgeschlossen. Nach Bestätigung wird nur die Restmenge gesucht. Doppelte Bestätigungen oder ein Neustart des Hintergrundprozesses erhöhen den Zähler nicht erneut.
 
-Bereits vor dem Start im Saalplan ausgewählte Plätze verhindern den automatischen Lauf; sie werden nicht eigenständig entfernt. Die Anzahl bezeichnet die während dieses Suchziels neu hinzuzufügenden Tickets. Ein vorhandener Warenkorb wird nicht geleert. Eine unbestätigte Übergabe wird niemals automatisch wiederholt. Bei unbekanntem Warenkorbformat, unerwarteter Anzahl neuer Einträge oder fehlenden zuvor bestätigten Tickets hält die Suche an. Bitte dann den Warenkorb und die Reservierungsfrist prüfen.
+Bereits vor dem Start im Saalplan ausgewählte Plätze verhindern den automatischen Lauf; sie werden nicht eigenständig entfernt. Die Anzahl bezeichnet die während dieses Suchziels neu hinzuzufügenden Tickets. Ein vorhandener Warenkorb wird nicht geleert. Eine unbestätigte Übergabe wird niemals automatisch wiederholt. Bei unbekanntem Warenkorbformat, unerwarteter Anzahl neuer Einträge oder fehlenden zuvor bestätigten Tickets hält die Suche an. Scheitert bereits die Platzwahl vor der Übergabe, kann die Suche nach Prüfung der Shop-Auswahl manuell neu gestartet werden. Bitte dann den Warenkorb und die Reservierungsfrist prüfen.
 
 **Stoppen** beendet Überwachung und Automatik. Nach Verarbeitung des Stopps werden keine weiteren Sitze ausgewählt und keine Warenkorbübergabe ausgelöst. Bereits ausgeführte Auswahlschritte bleiben im Shop sichtbar und müssen dort bei Bedarf geprüft oder zurückgesetzt werden. Schließen stoppt ebenfalls den Ablauf.
 
@@ -72,7 +74,7 @@ Während der gestarteten Überwachung wird der normale Aktualisierungsweg des Sh
 - Liegt der letzte bestätigte Empfang mehr als zwei Minuten zurück oder enthält die Antwort Fehler bzw. unbekannte Daten, startet keine Auswahl. Die Automatik nennt den Wartegrund. Fehler werden nicht als ausverkaufter Bestand behandelt.
 - Der Shop hat bei der Untersuchung mehrfach selbst als `expired: true` markierte Antworten geliefert. Ein geladener Saalplan allein beweist keinen aktuellen Datenstand.
 - Verfügbarkeit, Mapping-Sperrstatus und Preiskategorie werden geprüft. Buchungsregeln, persönliche Shopfilter und Nutzerberechtigungen können eine Auswahl dennoch verhindern. Zwischen Anzeige und Auswahl kann ein Sitz anderweitig vergeben werden.
-- Der Monitor zeigt Block, Reihe, technische Sitz-ID und Kategorie. Die Sitz-ID ist keine Sitznummer. Ton und Systembenachrichtigungen sind nicht enthalten.
+- Der Monitor zeigt Block, Reihe, technische Sitz-ID und Kategorie. Die Sitz-ID ist keine Sitznummer.
 - Unterstützt werden `/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/<ID>` sowie `/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/<ID>` und deren jeweilige `/shoppingcart`-Seiten auf `www.ticket-onlineshop.com`. Die Prüfung des Warenkorbs nutzt bekannte Ticketkarten und Warenkorbmarkierungen; unbekannte Varianten halten die Suche an. Andere Shop-, Saison- oder Sprachpfade sind nicht pauschal freigegeben.
 
 ## Technik und Datenschutz
@@ -99,7 +101,7 @@ Die Dekodierung folgt dem untersuchten Eventim-Saalplan-Client 6.20.0. Ein Sitz 
 
 `monitor.js` läuft als isoliertes Content-Script. Über die Seitenbrücke werden normalisierte Sitzdaten und Statusmeldungen übergeben, keine Cookies, Request-Header, Signaturen oder API-Schlüssel. Warenkorbbefehle gehen über den Service-Worker, der Extension-Absender, Tab, Event-Adresse und Modulversionen prüft. Der MAIN-Controller liest den Datenstand direkt vom Beobachter über `TicketDataObserver.getSnapshot()`; er ist nicht mehr auf eine separat initialisierte Kopie angewiesen. Auch ein erst nach den Netzwerkantworten erzeugter Controller erhält den vollständigen Stand. Vor jedem Auswahlschritt wird er erneut gelesen. Fehlende Daten, zu alte Daten und zu wenige passende Angebote werden mit unterschiedlichen Meldungen erklärt. Seitennachrichten können keine beliebigen IDs oder Browserbefehle einschleusen. Shoptexte werden als Text gerendert.
 
-Die Berechtigungen sind `activeTab`, `scripting` und `storage` sowie die beschränkte Content-Script-Zuordnung zu Saalplan und Warenkorb der beiden Werder-Shops. `storage.local` speichert Einstellungen und `storage.session` den laufenden Suchfortschritt, keine Cookies, Zugangsdaten oder Signaturen. `debugger` und Screenshots werden nicht verwendet.
+Die Berechtigungen sind `activeTab`, `scripting`, `storage` und `offscreen` für die Tonausgabe über Seitenwechsel hinweg sowie die beschränkte Content-Script-Zuordnung zu Saalplan und Warenkorb der beiden Werder-Shops. `storage.local` speichert Einstellungen und `storage.session` den laufenden Suchfortschritt, keine Cookies, Zugangsdaten oder Signaturen. `debugger` und Screenshots werden nicht verwendet.
 
 ## Entwicklung und Prüfstatus
 

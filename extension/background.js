@@ -1,5 +1,22 @@
 importScripts('availability-core.js', 'cart-session.js');
-let goalStore;
+let goalStore, openingAudio;
+const audioDocument = 'audio.html';
+async function playSound(sound) {
+  const documentUrl = chrome.runtime.getURL(audioDocument);
+  const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'], documentUrls: [documentUrl] });
+  if (!contexts.length) {
+    openingAudio ||= chrome.offscreen.createDocument({
+      url: audioDocument, reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Play ticket alerts independently of shop navigation.'
+    }).finally(() => { openingAudio = null; });
+    await openingAudio;
+  }
+  const response = await chrome.runtime.sendMessage({ target: 'ticket-audio', sound });
+  if (response?.error) throw new Error(response.error);
+}
+function notifySound(sound) {
+  void playSound(sound).catch(error => console.warn('Ticket-Ton konnte nicht abgespielt werden:', error.message));
+}
 const goals = () => goalStore ||= new TicketGoalSessions.Sessions({
   read: async key => (await chrome.storage.session.get(key))[key] || null,
   write: async (key, value) => chrome.storage.session.set({ [key]: value })
@@ -11,7 +28,7 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.0' || globalThis.TicketDataObserver?.version !== '1.4.0' || globalThis.TicketPreferences?.version !== '1.4.0' || globalThis.TicketRefresh?.version !== '1.4.0') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.4.1' || globalThis.TicketDataObserver?.version !== '1.4.1' || globalThis.TicketPreferences?.version !== '1.4.1' || globalThis.TicketRefresh?.version !== '1.4.1') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'refreshStart') return globalThis.TicketRefresh.start(config.seconds, config.revision);
         if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
         if (operation === 'baseline') return await globalThis.TicketCartReceipt.baseline();
@@ -45,7 +62,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.0']
+      args: ['1.4.1']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -88,14 +105,15 @@ chrome.action.onClicked.addListener(async tab => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop'].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || !['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalGet', 'goalStop', 'goalReceipt', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing'].includes(message?.type)) return;
   const tabId = sender.tab.id;
   let url; try { url = new URL(sender.url); } catch { return; }
   if (url.origin !== 'https://www.ticket-onlineshop.com') return;
   const context = TicketAvailability.shop(url.href), eventPage = context?.type === 'event', cartPage = context?.type === 'cart';
   if (!eventPage && !cartPage) return;
-  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop'].includes(message.type) && !eventPage) return;
+  if (['cartStart', 'cartStop', 'cartReload', 'goalBegin', 'goalOpen', 'refreshStart', 'refreshStop', 'availabilityPing'].includes(message.type) && !eventPage) return;
   (async () => {
+    if (message.type === 'availabilityPing') { notifySound('ping'); return {}; }
     if (message.type === 'cartReload') { await chrome.tabs.reload(tabId); return { stage: 'reloading' }; }
     if (message.type === 'refreshStart') return await invokeCart(tabId, 'refreshStart', { seconds: message.seconds, documentToken: message.documentToken, revision: message.revision });
     if (message.type === 'refreshStop') return await invokeCart(tabId, 'refreshStop', { documentToken: message.documentToken, revision: message.revision });
@@ -116,8 +134,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     }
     if (message.type === 'goalReceipt') {
       if (!cartPage) throw new Error('Die Warenkorbbestätigung muss auf der Warenkorbseite erfolgen.');
-      const confirmed = await goals().confirm(tabId, goal.id, message.receipt);
-      if (confirmed.status === 'watching') await chrome.tabs.update(tabId, { url: confirmed.eventUrl });
+      let accepted = false;
+      const confirmed = await goals().confirm(tabId, goal.id, message.receipt, () => {
+        accepted = true;
+        notifySound('horn');
+      });
+      if (accepted && confirmed.status === 'watching') await chrome.tabs.update(tabId, { url: confirmed.eventUrl });
       return { goal: confirmed };
     }
     if (message.type === 'goalOpen') {

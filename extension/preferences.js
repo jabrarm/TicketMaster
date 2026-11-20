@@ -119,7 +119,12 @@
     }
     return null;
   }
-  const api = { version: '1.4.0', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates };
+  function hasCandidate(snapshot, config, secured = [], now = Date.now()) {
+    if (!snapshot || !Number.isFinite(snapshot.checkedAt) || snapshot.checkedAt > now + 1000 || now - snapshot.checkedAt > 120000) return false;
+    const ranks = rank(config), excluded = new Set(secured.map(s => Number(s.id)));
+    return snapshot.seats.some(seat => !excluded.has(seat.id) && ranks.has(match(seat)));
+  }
+  const api = { version: '1.4.1', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

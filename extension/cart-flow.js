@@ -9,21 +9,56 @@
     const check = run => { if (run.cancelled || active !== run) throw new Error('Automatik gestoppt. Bereits ausgewählte Plätze bitte im Shop prüfen.'); };
     const ids = selection => selection.map(s => String(s.id));
     const exact = (actual, expected) => actual.length === expected.length && actual.every(id => expected.includes(id));
+    const selectionTimeout = () => new Error('Der Shop hat die Platzauswahl nicht rechtzeitig bestätigt. Auswahl und Shopfilter bitte prüfen; es wird nichts zum Warenkorb hinzugefügt.');
     async function until(run, predicate) {
-      const end = now() + (env.timeout || 15000);
+      const timeout = env.timeout || 15000;
+      check(run);
+      if (predicate()) return;
+      if (env.watchSelection) {
+        await new Promise((resolve, reject) => {
+          let unwatch, interval, timer;
+          const finish = error => {
+            unwatch?.();
+            clearInterval(interval);
+            clearTimeout(timer);
+            run.wake = null;
+            if (error) reject(error); else resolve();
+          };
+          const inspect = () => {
+            try { check(run); if (predicate()) finish(); }
+            catch (error) { finish(error); }
+          };
+          run.wake = inspect;
+          unwatch = env.watchSelection(inspect);
+          // Keep a fallback for selection changes that don't mutate the DOM.
+          interval = setInterval(inspect, 75);
+          timer = setTimeout(() => finish(selectionTimeout()), timeout);
+          inspect();
+        });
+        return;
+      }
+      const end = now() + timeout;
       while (now() < end) { check(run); if (predicate()) return; await wait(75); }
-      throw new Error('Der Shop hat die Platzauswahl nicht rechtzeitig bestätigt. Auswahl und Shopfilter bitte prüfen; es wird nichts zum Warenkorb hinzugefügt.');
+      throw selectionTimeout();
     }
     const api = {
-      version: '1.4.0',
+      version: '1.4.1',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.0', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.1', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
-      cancel(runId) { cancelled.add(runId); if (active && active.id === runId) { active.cancelled = true; if (active.prepared) active = null; } return { stage: 'stopped' }; },
+      cancel(runId) {
+        cancelled.add(runId);
+        if (active?.id === runId) {
+          active.cancelled = true;
+          active.wake?.();
+          if (active.prepared) active = null;
+        }
+        return { stage: 'stopped' };
+      },
       async prepare(config, runId, secured = []) {
         if (typeof runId !== 'string' || !/^[a-zA-Z0-9-]{8,100}$/.test(runId)) throw new Error('Ungültige Automatik-Sitzung.');
         if (cancelled.has(runId)) throw new Error('Diese Automatik-Sitzung wurde bereits gestoppt.');
@@ -53,11 +88,15 @@
             check(run);
             snapshot = currentSnapshot();
             if (!snapshot) throw new Error('Die Shopdaten stehen nicht mehr zur Verfügung. Bitte Auswahl im Shop prüfen.');
-            if (!prefs.candidates({ ...snapshot, seats: snapshot.seats.filter(s => s.id === seat.id) }, { ...config, quantity: 1 }, now())) throw new Error('Der empfangene Stand ist zu alt oder der Platz wird nicht mehr angeboten. Bereits ausgewählte Plätze bitte im Shop prüfen.');
+            const offered = snapshot.seats.find(s => s.id === seat.id);
+            if (!offered || !prefs.candidates({ ...snapshot, seats: [offered] }, { ...config, quantity: 1 }, now())) throw new Error('Der empfangene Stand ist zu alt oder der Platz wird nicht mehr angeboten. Bereits ausgewählte Plätze bitte im Shop prüfen.');
             const expected = [...run.selected, 's' + seat.id];
             if (!exact(ids(selection.getSelectedSeats()), run.selected)) throw new Error('Die Platzauswahl wurde zwischenzeitlich verändert. Automatik angehalten.');
             client.selectById('s' + seat.id);
-            await until(run, () => exact(ids(selection.getSelectedSeats()), expected) && env.cardReady('s' + seat.id));
+            await until(run, () => {
+              if (selection.getLostSeatAmount?.() > 0) throw new Error('Der Shop meldet verlorene Plätze. Kein Warenkorbklick.');
+              return exact(ids(selection.getSelectedSeats()), expected) && env.cardReady('s' + seat.id);
+            });
             run.selected = expected;
           }
           check(run);
@@ -110,7 +149,14 @@
       const action = new URL(form.action, location.href), path = context.basePath + 'shoppingcart/addselecteditemsareas/event/' + eventId();
       return action.origin === location.origin && action.pathname === path;
     },
-    cardReady: id => [...document.querySelectorAll('#seat-cards-list > li[data-seat-identifier]')].some(card => card.getAttribute('data-seat-identifier') === id && !card.classList.contains('hidden-card') && card.querySelector('input,select')),
+    watchSelection: inspect => {
+      const observer = new MutationObserver(inspect);
+      observer.observe(document.querySelector('#seatCardForm') || document.documentElement, {
+        subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-seat-identifier']
+      });
+      return () => observer.disconnect();
+    },
+    cardReady: id => Boolean(document.querySelector('#seat-cards-list > li[data-seat-identifier="' + CSS.escape(id) + '"]:not(.hidden-card) :is(input, select)')),
     buttonReady: button => !button.disabled && !button.classList.contains('button--disabled') && button.getAttribute('aria-disabled') !== 'true' && button.getClientRects().length > 0 && getComputedStyle(button).visibility !== 'hidden' && getComputedStyle(button).pointerEvents !== 'none'
   });
 })();

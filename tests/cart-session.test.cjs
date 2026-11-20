@@ -30,8 +30,11 @@ test('pending submission survives a worker restart and duplicate receipt cannot 
   const { sessions, storage } = await setup(); await submit(sessions, 'run-1', [], [1001]);
   const restored = new Sessions(storage);
   await assert.rejects(restored.attempt(19, 'goal-01', 'run-2', receipt([])), /noch nicht bestätigt/);
-  await restored.confirm(19, 'goal-01', receipt(['cart-1']));
-  assert.equal((await restored.confirm(19, 'goal-01', receipt(['cart-1']))).confirmed.length, 1);
+  let notifications = 0;
+  const confirm = () => restored.confirm(19, 'goal-01', receipt(['cart-1']), () => notifications++);
+  const results = await Promise.all([confirm(), confirm()]);
+  assert.deepEqual(results.map(goal => goal.confirmed.length), [1, 1]);
+  assert.equal(notifications, 1);
 });
 test('pre-existing cart items do not count towards the new target and confirmed seats cannot be submitted twice', async () => {
   const { sessions } = await setup(); await submit(sessions, 'run-1', ['old-ticket'], [1001]);
@@ -53,4 +56,17 @@ test('explicit resume after stop preserves the previously confirmed part of the 
   await sessions.stop(19, 'goal-01');
   const resumed = await sessions.begin(19, 'new-unused-id', { ...preferences.defaults(), quantity: 2 }, url);
   assert.equal(resumed.id, 'goal-01'); assert.equal(resumed.confirmed.length, 1); assert.equal(resumed.target - resumed.confirmed.length, 1);
+});
+
+test('a failed selection before submission can be restarted explicitly, retaining confirmed tickets', async () => {
+  const { sessions } = await setup();
+  await submit(sessions, 'run-1', [], [1001]);
+  await sessions.confirm(19, 'goal-01', receipt(['cart-1']));
+  await sessions.attempt(19, 'goal-01', 'run-2', receipt(['cart-1']));
+  const paused = await sessions.pause(19, 'goal-01', 'Sitz verloren.');
+  assert.equal(paused.pending, null);
+  const restarted = await sessions.begin(19, 'new-unused-id', paused.config, url);
+  assert.equal(restarted.id, 'goal-01');
+  assert.equal(restarted.status, 'watching');
+  assert.deepEqual(restarted.confirmed, ['cart-1']);
 });
