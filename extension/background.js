@@ -35,9 +35,9 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.3' || globalThis.TicketDataObserver?.version !== '1.4.3' || globalThis.TicketPreferences?.version !== '1.4.3' || globalThis.TicketRefresh?.version !== '1.4.3') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.4.4' || globalThis.TicketDataObserver?.version !== '1.4.4' || globalThis.TicketPreferences?.version !== '1.4.4' || globalThis.TicketRefresh?.version !== '1.4.4') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'refreshStart') return globalThis.TicketRefresh.start(config.seconds, config.revision);
-        if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
+        if (operation === 'validate') { globalThis.TicketPreferences.validate(config); return { config: { quantity: config.quantity, selectionMode: config.selectionMode ?? 'preference', adjacent: config.adjacent, refreshSeconds: config.refreshSeconds ?? 20, groups: config.groups } }; }
         if (operation === 'session') return { session: await globalThis.TicketCartReceipt.checkSession() };
         if (operation === 'baseline') return await globalThis.TicketCartReceipt.baseline();
         if (operation === 'open') { if (typeof sms !== 'undefined' && !sms.isSeatmapLoaded()) document.querySelector('#choose-seat-button')?.click(); return { stage: 'opened' }; }
@@ -70,7 +70,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.3']
+      args: ['1.4.4']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',

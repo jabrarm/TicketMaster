@@ -34,6 +34,18 @@
       const interval = node('input', null, intervalLabel); interval.type = 'number'; interval.min = '0.5'; interval.max = '120'; interval.step = '0.5'; interval.value = config.refreshSeconds ?? 20; interval.setAttribute('aria-label', 'Abfrageintervall in Sekunden');
       interval.onchange = () => { const value = Number(interval.value); if (!validRefreshSeconds(value)) { interval.value = config.refreshSeconds ?? 20; return; } config.refreshSeconds = value; update(); };
       const frequencyHelp = node('p', '0,5–120 Sekunden, Standard 20. Langsame Anfragen und Shop-Pausen verlängern den Abstand. Häufigere Abfragen garantieren keine frischeren Daten.', field); frequencyHelp.className = 'muted';
+      const modeLabel = node('label', 'Platzwahl ', field);
+      const mode = node('select', null, modeLabel);
+      mode.setAttribute('aria-label', 'Modus für die Platzwahl');
+      node('option', 'Nach meinen Präferenzen', mode).value = 'preference';
+      node('option', 'Ohne Präferenzen – erste freie Plätze', mode).value = 'first';
+      mode.value = config.selectionMode ?? 'preference';
+      mode.onchange = () => { config.selectionMode = mode.value; update(); };
+      if (config.selectionMode === 'first') {
+        const info = node('p', 'Nimmt freie Sitzplätze in der Reihenfolge der Shopdaten. Alle Preiskategorien sind möglich. Bei mehreren Tickets können die Plätze getrennt liegen.', field);
+        info.className = 'muted';
+        return;
+      }
       const adjacencyLabel = node('label', null, field); adjacencyLabel.className = 'checkline';
       const adjacency = node('input', null, adjacencyLabel); adjacency.type = 'checkbox'; adjacency.checked = config.adjacent;
       node('span', 'Nebeneinander bevorzugen; sonst nach Kategoriepräferenz', adjacencyLabel);
@@ -65,7 +77,7 @@
       refreshCounts();
     }
     function refreshCounts() {
-      if (!snapshot) return;
+      if (!snapshot || config.selectionMode === 'first') return;
       const counts = new Map(); let unknown = 0, parentOnly = 0;
       for (const seat of snapshot.seats) { const id = match(seat); if (id) { counts.set(id, (counts.get(id) || 0) + 1); if (id.endsWith(':*')) parentOnly++; } else unknown++; }
       for (const group of config.groups) {

@@ -4,14 +4,14 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const { fixture } = require('./availability.fixture.cjs');
 const source = name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8');
 const base = '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
-async function setup(browser, regular = false, delayedCart = false) {
+async function setup(browser, regular = false, delayedCart = false, firstAvailable = false) {
   const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
   const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
   const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [], loggedIn: true };
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   for (const part of Object.values(data)) part.seatmapId = event;
-  if (regular) for (const category of data.mapping.priceCategories) category.name = 'PK1';
+  if (regular) for (const category of data.mapping.priceCategories) category.name = firstAvailable ? 'Sonderangebot ohne Kategoriezuordnung' : 'PK1';
   const cartPath = base + (delayedCart ? 'shoppingcart/index' : 'shoppingcart');
   const cartHtml = navigation => {
     const cards = backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) =>
@@ -94,6 +94,7 @@ async function setup(browser, regular = false, delayedCart = false) {
   const panel = page.locator('#ticket-data-monitor');
   await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).fill('2'); await panel.getByRole('spinbutton', { name: 'Anzahl Tickets' }).dispatchEvent('change');
   await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('0.5'); await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
+  if (firstAvailable) await panel.getByRole('combobox', { name: 'Modus für die Platzwahl' }).selectOption('first');
   await panel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).click();
   try { await page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#goal-progress')?.textContent.includes('1 / 2'), null, { timeout: 15000 }); }
   catch (error) {
@@ -147,15 +148,17 @@ async function setup(browser, regular = false, delayedCart = false) {
     console.log('PASS: logout on the cart preflight stops before seat selection, rechecking login and manually restarting preserves previously confirmed tickets');
     await expired.page.close();
 
-    const regular = await setup(browser, true, true);
+    const regular = await setup(browser, true, true, true);
     assert.deepEqual(regular.backend.posts, [[1001]]);
+    assert.equal(regular.state().config.selectionMode, 'first');
+    assert.equal(await regular.page.locator('#ticket-data-monitor').getByRole('combobox', { name: 'Modus für die Platzwahl' }).inputValue(), 'first');
     regular.backend.second = true; await regular.page.evaluate(() => sms.refreshAvailability());
     await regular.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
     assert.deepEqual(regular.backend.posts, [[1001], [1002]]);
     assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart/index');
     assert.equal(regular.state().eventUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382');
     assert.deepEqual(regular.backend.sounds, ['horn', 'horn']);
-    console.log('PASS: the regular Einzelkarten shop confirms delayed cart cards on /shoppingcart/index and triggers the horn once per batch');
+    console.log('PASS: first-available mode persists across navigation and buys offers without a known category mapping in the regular shop');
     await regular.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

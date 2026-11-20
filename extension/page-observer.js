@@ -9,7 +9,7 @@
   const channel = 'ticket-data-monitor-v1';
   let latest = null;
   globalThis.TicketDataObserver = Object.freeze({
-    version: '1.4.3',
+    version: '1.4.4',
     getSnapshot: () => inventory.last ? structuredClone(inventory.last) : null,
     getError: () => latest?.type === 'error' ? latest.message : null,
     getRequestState: () => requests.state()

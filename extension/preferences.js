@@ -17,10 +17,11 @@
     ] }
   ];
   const allIds = catalog.flatMap(g => g.children.map(c => c.id));
-  function defaults() { return { quantity: 1, adjacent: true, refreshSeconds: 20, groups: catalog.map(g => ({ id: g.id, children: g.children.map(c => ({ id: c.id, enabled: true })) })) }; }
+  function defaults() { return { quantity: 1, selectionMode: 'preference', adjacent: true, refreshSeconds: 20, groups: catalog.map(g => ({ id: g.id, children: g.children.map(c => ({ id: c.id, enabled: true })) })) }; }
   const validRefreshSeconds = value => Number.isInteger(value * 2) && value >= 0.5 && value <= 120 && typeof value === 'number';
   function validate(config) {
     if (!config || !Number.isInteger(config.quantity) || config.quantity < 1 || config.quantity > 6 || typeof config.adjacent !== 'boolean' || !Array.isArray(config.groups) || config.groups.length !== catalog.length) throw new Error('Bitte 1 bis 6 Tickets und gültige Kategorien auswählen.');
+    if (config.selectionMode !== undefined && !['preference', 'first'].includes(config.selectionMode)) throw new Error('Ungültiger Modus für die Platzwahl.');
     if (config.refreshSeconds !== undefined && !validRefreshSeconds(config.refreshSeconds)) throw new Error('Das Abfrageintervall muss in Halbschritten zwischen 0,5 und 120 Sekunden liegen.');
     const groupIds = new Set(), children = new Set();
     for (const group of config.groups) {
@@ -52,17 +53,33 @@
     // parent is allowed. Explicitly conflicting row/region data never falls back.
     return group.children.some(c => source.includes(normal(c.region))) ? null : group.id + ':*';
   }
-  function rank(config) {
-    validate(config);
+  function rank(config) { return ranksFor(validate(config)); }
+  function ranksFor(config) {
     return new Map(config.groups.flatMap(g => [
       ...g.children.filter(c => c.enabled).map(c => c.id),
       ...(g.id !== 'vip' && g.children.every(c => c.enabled) ? [g.id + ':*'] : [])
     ]).map((id, index) => [id, index]));
   }
+  const recent = (snapshot, now) => Number.isFinite(snapshot?.checkedAt) &&
+    snapshot.checkedAt <= now + 1000 && now - snapshot.checkedAt <= 120000;
+  function firstSeats(snapshot, limit, excluded) {
+    const seats = [];
+    for (const seat of snapshot.seats) {
+      if (excluded?.has(seat.id)) continue;
+      seats.push(seat);
+      if (seats.length === limit) break;
+    }
+    return seats.length ? { seats, adjacent: seats.length === 1 } : null;
+  }
   function plan(snapshot, config, now = Date.now(), cacheCandidates = false) {
-    const ranks = rank(config);
-    if (!snapshot || !Number.isFinite(snapshot.checkedAt) || snapshot.checkedAt > now + 1000 || now - snapshot.checkedAt > 120000) return null;
+    validate(config);
+    if (!recent(snapshot, now)) return null;
     if (!cacheCandidates && (snapshot.stale || (Number.isFinite(snapshot.validUntil) && snapshot.validUntil < now))) return null;
+    if (config.selectionMode === 'first') {
+      const first = firstSeats(snapshot, config.quantity);
+      return first?.seats.length === config.quantity ? first : null;
+    }
+    const ranks = ranksFor(config);
     const seats = snapshot.seats.map(s => ({ ...s, preference: match(s) })).filter(s => ranks.has(s.preference));
     const compare = (a, b) => ranks.get(a.preference) - ranks.get(b.preference) || a.id - b.id;
     seats.sort(compare);
@@ -98,9 +115,10 @@
   const candidates = (snapshot, config, now = Date.now()) => plan(snapshot, config, now, true);
   function partialCandidates(snapshot, config, remaining = config.quantity, secured = [], now = Date.now()) {
     validate(config);
-    if (!Number.isInteger(remaining) || remaining < 1 || remaining > config.quantity) return null;
+    if (!Number.isInteger(remaining) || remaining < 1 || remaining > config.quantity || !recent(snapshot, now)) return null;
     const excluded = new Set(secured.map(s => Number(s.id)));
-    const available = snapshot ? { ...snapshot, seats: snapshot.seats.filter(s => !excluded.has(s.id)) } : null;
+    if (config.selectionMode === 'first') return firstSeats(snapshot, remaining, excluded);
+    const available = { ...snapshot, seats: snapshot.seats.filter(s => !excluded.has(s.id)) };
     for (let count = remaining; count >= 1; count--) {
       const result = candidates(available, { ...config, quantity: count }, now);
       if (!result) continue;
@@ -121,11 +139,13 @@
     return null;
   }
   function hasCandidate(snapshot, config, secured = [], now = Date.now()) {
-    if (!snapshot || !Number.isFinite(snapshot.checkedAt) || snapshot.checkedAt > now + 1000 || now - snapshot.checkedAt > 120000) return false;
-    const ranks = rank(config), excluded = new Set(secured.map(s => Number(s.id)));
+    if (!recent(snapshot, now)) return false;
+    const excluded = new Set(secured.map(s => Number(s.id)));
+    if (config.selectionMode === 'first') return snapshot.seats.some(seat => !excluded.has(seat.id));
+    const ranks = rank(config);
     return snapshot.seats.some(seat => !excluded.has(seat.id) && ranks.has(match(seat)));
   }
-  const api = { version: '1.4.3', validRefreshSeconds, catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
+  const api = { version: '1.4.4', validRefreshSeconds, catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
   if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();

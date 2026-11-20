@@ -4,6 +4,8 @@
       !globalThis.TicketPreferencePanel) return;
   const channel = 'ticket-data-monitor-v1', { Tracker, eventId } = globalThis.TicketAvailability;
   const tracker = new Tracker();
+  const blockOrder = new Intl.Collator('de', { numeric: true });
+  let sortedSnapshot, sortedSeats = [];
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
   let preferences, config = globalThis.TicketPreferences.defaults(), armed = false, inFlight = false, runId = null, cartMessage = '', submitted = false;
   let goal = null, actionEpoch = 0;
@@ -95,7 +97,7 @@
       if (submitted || armed || inFlight || sessionBlocked(session)) return;
       const epoch = ++actionEpoch;
       config = preferences.get();
-      try { globalThis.TicketPreferences.validate(config); if (![...globalThis.TicketPreferences.rank(config)].length) throw new Error('Bitte mindestens eine Unterkategorie auswählen.'); }
+      try { globalThis.TicketPreferences.validate(config); if (config.selectionMode !== 'first' && !globalThis.TicketPreferences.rank(config).size) throw new Error('Bitte mindestens eine Unterkategorie auswählen.'); }
       catch (e) { cartMessage = e.message; render(); return; }
       inFlight = true; preferences.lock(true); render();
       try {
@@ -198,12 +200,16 @@
     ui.querySelector('#count-label').textContent = expired || stale ? 'Sitzangebote aus der zuletzt empfangenen Shop-Liste' : 'gemeldete freie Sitze';
     const filter = ui.querySelector('#block'), selected = filter.value;
     filter.replaceChildren(); const all = text('option', 'Alle Blöcke', filter); all.value = '';
-    const blocks = new Map((last?.seats || []).map(x => [String(x.blockId), x.block]));
+    if (last !== sortedSnapshot) {
+      sortedSnapshot = last;
+      sortedSeats = last ? [...last.seats].sort((a, b) => blockOrder.compare(a.block, b.block) || a.id - b.id) : [];
+    }
+    const blocks = new Map(sortedSeats.map(x => [String(x.blockId), x.block]));
     for (const [id, name] of blocks) { const option = text('option', decode(name), filter); option.value = id; }
     filter.value = blocks.has(selected) ? selected : '';
     const body = ui.querySelector('#seats'); body.replaceChildren();
     const added = new Set(change?.added.map(x => x.id) || []);
-    for (const seat of last?.seats || []) {
+    for (const seat of sortedSeats) {
       if (filter.value && String(seat.blockId) !== filter.value) continue;
       const row = document.createElement('tr'); row.classList.toggle('new', added.has(seat.id));
       const block = text('td', decode(seat.block), row); text('small', 'Reihe ' + decode(seat.row), block);

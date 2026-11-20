@@ -25,6 +25,12 @@ test('joins delta-encoded seat groups, negative category deltas, labels and avai
   assert.deepEqual(snapshot.seats.map(x => [x.id, x.block, x.row, x.category]), [[1001, 'N1', '20', 'VIP'], [3001, 'O2', '4', 'VIP']]);
   assert.equal(snapshot.stale, false);
 });
+test('availability order survives decoding even when block names would sort differently', () => {
+  const data = fixture();
+  data.seatmap.areas[0].blocks[0].name = 'Z1';
+  data.seatmap.areas[0].blocks[1].name = 'A2';
+  assert.deepEqual(loaded(data).snapshot.seats.map(seat => seat.id), [1001, 3001]);
+});
 test('all three matching sources are required, including when availability arrives before geometry', () => {
   const inv = new Inventory(), data = fixture();
   assert.equal(inv.accept('availability', data.availability, identity), null);

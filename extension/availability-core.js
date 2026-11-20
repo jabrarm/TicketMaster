@@ -103,7 +103,7 @@
       const stale = availability.expired === true || (Number.isFinite(availability.expiryTimestamp) && availability.expiryTimestamp < now);
       return { inventory: this.identity, version: versions[0], timestamp: availability.timestamp, checkedAt: now, stale,
         validUntil: Number.isFinite(availability.expiryTimestamp) ? availability.expiryTimestamp : null,
-        seats: result.sort((a, b) => a.block.localeCompare(b.block, 'de', { numeric: true }) || a.id - b.id) };
+        seats: result };
     }
   }
   class Tracker {

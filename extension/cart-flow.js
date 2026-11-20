@@ -42,12 +42,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.3',
+      version: '1.4.4',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.3', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.4', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {
@@ -72,6 +72,7 @@
         if (!Number.isFinite(snapshot.checkedAt) || now() - snapshot.checkedAt > 120000) throw new Error('Der empfangene Datenstand im Auswahlmodul ist älter als zwei Minuten. Bitte den Saalplan neu laden.');
         const plan = prefs.partialCandidates(snapshot, config, config.quantity, secured, now());
         if (!plan) {
+          if (config.selectionMode === 'first') throw new Error('Der Shop meldet keine noch fehlenden verfügbaren Sitzplätze.');
           const ranks = prefs.rank(config), matching = snapshot.seats.filter(s => ranks.has(prefs.match(s))).length;
           throw new Error('Die Auswahl findet ' + matching + ' passende Sitzangebote für ' + config.quantity + ' gewünschte Tickets. Bitte Kategorie-Häkchen und Ticketanzahl prüfen.');
         }

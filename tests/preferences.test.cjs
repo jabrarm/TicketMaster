@@ -74,3 +74,18 @@ test('polling interval defaults to 20, supports half a second and accepts legacy
   config.refreshSeconds = 0.25; assert.throws(() => prefs.validate(config), /Intervall|intervall/);
   delete config.refreshSeconds; assert.equal(prefs.validate(config), config);
 });
+test('first-available mode uses shop order, skips secured seats and stops at the remaining quantity', () => {
+  const config = { ...prefs.defaults(), selectionMode: 'first', quantity: 2 };
+  for (const group of config.groups) for (const child of group.children) child.enabled = false;
+  const current = snapshot([seat(20, 'Nicht zugeordnete Preiskategorie'), seat(5), seat(1)]);
+  assert.equal(prefs.hasCandidate(current, config), true);
+  assert.deepEqual(prefs.partialCandidates(current, config).seats.map(s => s.id), [20, 5]);
+  assert.deepEqual(prefs.partialCandidates(current, config, 2, [{ id: 20 }, { id: 1 }]).seats.map(s => s.id), [5]);
+  assert.equal(prefs.hasCandidate(current, config, current.seats), false);
+  assert.equal(prefs.partialCandidates({ ...current, checkedAt: Date.now() - 120001 }, config), null);
+  assert.equal(prefs.plan({ ...current, stale: true }, config), null);
+  assert.equal(prefs.candidates({ ...current, stale: true }, { ...config, quantity: 1 }).seats[0].id, 20);
+  const legacy = prefs.defaults();
+  delete legacy.selectionMode;
+  assert.equal(prefs.partialCandidates(current, legacy).seats[0].id, 1);
+});
