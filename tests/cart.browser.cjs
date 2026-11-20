@@ -79,7 +79,7 @@ async function setup(browser, delay = 0, expired = false) {
     await pending.panel.getByRole('button', { name: 'Automatisch in den Warenkorb', exact: true }).click();
     await pending.page.waitForFunction(() => window.selected.length === 1);
     await pending.panel.getByRole('button', { name: 'Stoppen', exact: true }).click();
-    await pending.page.waitForFunction(() => document.querySelector('#ticket-data-monitor').shadowRoot.querySelector('#cart-status').textContent.includes('Automatik angehalten'));
+    await pending.page.waitForFunction(() => document.querySelector('#ticket-data-monitor').shadowRoot.querySelector('#cart-status').textContent.includes('Stoppen angefordert'));
     assert.equal(await pending.page.evaluate(() => window.selected.length), 1);
     assert.equal(await pending.page.evaluate(() => window.cartCalls), 0);
     assert.deepEqual(pending.errors, []);

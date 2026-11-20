@@ -78,7 +78,7 @@
       timer = null; openMapIfReady(); void trigger(); if (running) timer = schedule(tick, seconds * 1000);
     }
     return {
-      version: '1.4.5',
+      version: '1.4.6',
       start(value, commandRevision, openMap = false) {
         if (!preferences().validRefreshSeconds(value)) throw new Error('Das Abfrageintervall muss in Halbschritten zwischen 0,5 und 120 Sekunden liegen.');
         if (!acceptRevision(commandRevision)) return { running, seconds };

@@ -42,12 +42,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.5',
+      version: '1.4.6',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.5', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.6', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {
@@ -71,13 +71,10 @@
         if (!env.eventId() || !snapshot.inventory.endsWith('-' + env.eventId())) throw new Error('Die Ticketseite hat gewechselt.');
         if (!Number.isFinite(snapshot.checkedAt) || now() - snapshot.checkedAt > 120000) throw new Error('Der empfangene Datenstand im Auswahlmodul ist älter als zwei Minuten. Bitte den Saalplan neu laden.');
         const plan = prefs.partialCandidates(snapshot, config, config.quantity, secured, now());
-        if (!plan) {
-          if (config.selectionMode === 'first') throw new Error('Der Shop meldet keine noch fehlenden verfügbaren Sitzplätze.');
-          const ranks = prefs.rank(config), matching = snapshot.seats.filter(s => ranks.has(prefs.match(s))).length;
-          throw new Error('Die Auswahl findet ' + matching + ' passende Sitzangebote für ' + config.quantity + ' gewünschte Tickets. Bitte Kategorie-Häkchen und Ticketanzahl prüfen.');
-        }
+        if (!plan) return { stage: 'waiting', message: 'Das Sitzangebot hat sich geändert. Warte auf weitere passende Plätze.' };
         const client = env.client(), selection = env.selection();
-        if (!client?.isSeatmapLoaded?.() || typeof client.selectById !== 'function' || typeof selection?.getSelectedSeats !== 'function') throw new Error('Bitte zuerst den Saalplan des Shops öffnen und vollständig laden lassen.');
+        if (!client?.isSeatmapLoaded?.()) return { stage: 'waiting', message: 'Der Saalplan lädt noch. Warte auf die nächste Shopantwort.' };
+        if (typeof client.selectById !== 'function' || typeof selection?.getSelectedSeats !== 'function') throw new Error('Der Saalplan unterstützt die bekannte Platzwahl nicht.');
         if (selection.getSelectedSeats().length) throw new Error('Es sind bereits Plätze im Shop ausgewählt. Bitte diese Auswahl zuerst prüfen oder zurücksetzen.');
         const max = env.maxTickets();
         if (!Number.isInteger(max) || config.quantity > max) throw new Error('Die gewünschte Anzahl überschreitet das bestätigte Shop-Limit.');
@@ -91,7 +88,10 @@
             snapshot = currentSnapshot();
             if (!snapshot) throw new Error('Die Shopdaten stehen nicht mehr zur Verfügung. Bitte Auswahl im Shop prüfen.');
             const offered = snapshot.seats.find(s => s.id === seat.id);
-            if (!offered || !prefs.candidates({ ...snapshot, seats: [offered] }, { ...config, quantity: 1 }, now())) throw new Error('Der empfangene Stand ist zu alt oder der Platz wird nicht mehr angeboten. Bereits ausgewählte Plätze bitte im Shop prüfen.');
+            if (!offered || !prefs.candidates({ ...snapshot, seats: [offered] }, { ...config, quantity: 1 }, now())) {
+              if (!run.selected.length) return { stage: 'waiting', message: 'Der Sitz ist nicht mehr verfügbar. Warte auf weitere passende Plätze.' };
+              throw new Error('Der empfangene Stand ist zu alt oder der Platz wird nicht mehr angeboten. Bereits ausgewählte Plätze bitte im Shop prüfen.');
+            }
             const expected = [...run.selected, 's' + seat.id];
             if (!exact(ids(selection.getSelectedSeats()), run.selected)) throw new Error('Die Platzauswahl wurde zwischenzeitlich verändert. Automatik angehalten.');
             client.selectById('s' + seat.id);
@@ -129,7 +129,8 @@
         } finally { if (active === run) active = null; }
       },
       async start(config, runId) {
-        await api.prepare(config, runId); return api.submit(runId);
+        const result = await api.prepare(config, runId);
+        return result.stage === 'prepared' ? api.submit(runId) : result;
       }
     };
     return api;

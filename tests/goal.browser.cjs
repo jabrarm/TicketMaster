@@ -4,11 +4,11 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const { fixture } = require('./availability.fixture.cjs');
 const source = name => fs.readFileSync(path.join(__dirname, '../extension', name), 'utf8');
 const base = '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
-async function setup(browser, regular = false, delayedCart = false, firstAvailable = false) {
+async function setup(browser, regular = false, delayedCart = false, firstAvailable = false, offerDisappears = false) {
   const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
   const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
-  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [], loggedIn: true };
+  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [], loggedIn: true, suppressFirst: false };
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   for (const part of Object.values(data)) part.seatmapId = event;
   if (regular) for (const category of data.mapping.priceCategories) category.name = firstAvailable ? 'Sonderangebot ohne Kategoriezuordnung' : 'PK1';
@@ -45,11 +45,12 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     if ([base + 'shoppingcart', cartPath].includes(url.pathname)) return route.fulfill({ contentType: 'text/html', body: cartHtml(request.isNavigationRequest()) });
     if (url.hostname === 'www.ticket-onlineshop.com') return route.fulfill({ contentType: 'text/html', body: eventHtml });
     const kind = url.pathname.split('/').at(-2);
-    const result = kind === 'availability' ? { ...data.availability, timestamp: Date.now(), expired: true, seats: [[1001, 1], [1, backend.second ? 1 : 0], [999, 0], [1000, backend.second ? 1 : 0]] } : data[kind];
+    const result = kind === 'availability' ? { ...data.availability, timestamp: Date.now(), expired: true, seats: [[1001, backend.suppressFirst ? 0 : 1], [1, backend.second ? 1 : 0], [999, 0], [1000, backend.second ? 1 : 0]] } : data[kind];
     return route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(result) });
   });
   await page.addInitScript({ content: `if(location.pathname.includes('/areaplan/venue/event/')){` + ['availability-core.js', 'preferences.js', 'cart-receipt.js', 'cart-flow.js', 'refresh.js', 'page-observer.js'].map(source).join('\n') + '\n}' });
   const stored = {}, contexts = new Map(); let currentContext, click, handleMessage, installing = Promise.resolve();
+  let removeOfferBeforeSelection = offerDisappears;
   async function evaluate(expression, contextId) {
     const r = await cdp.send('Runtime.evaluate', { expression, ...(contextId ? { contextId } : {}), awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
@@ -66,7 +67,15 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     },
     storage: { session: { get: async key => ({ [key]: structuredClone(stored[key]) }), set: async value => { Object.assign(stored, structuredClone(value)); } } },
     tabs: { reload: async () => page.reload(), update: async (id, value) => { assert.equal(id, 19); backend.returns++; await page.goto(value.url); } },
-    scripting: { executeScript: async options => [{ frameId: 0, result: await evaluate(options.files ? options.files.map(source).join('\n') : '(' + options.func.toString() + ')(...' + JSON.stringify(options.args || []) + ')', options.world === 'ISOLATED' ? currentContext : undefined) }] }
+    scripting: { executeScript: async options => {
+      if (removeOfferBeforeSelection && options.args?.[0] === 'prepare') {
+        removeOfferBeforeSelection = false;
+        backend.suppressFirst = true;
+        await page.evaluate(url => fetch(url), 'https://public-api.eventim.com/seatmap/api/public/availability/tixx-1001-' + event);
+        await page.waitForFunction(() => TicketDataObserver.getSnapshot()?.seats.length === 0);
+      }
+      return [{ frameId: 0, result: await evaluate(options.files ? options.files.map(source).join('\n') : '(' + options.func.toString() + ')(...' + JSON.stringify(options.args || []) + ')', options.world === 'ISOLATED' ? currentContext : undefined) }];
+    } }
   } };
   const context = vm.createContext(sandbox); sandbox.importScripts = (...names) => { for (const n of names) vm.runInContext(source(n), context); }; vm.runInContext(source('background.js'), context);
   cdp.on('Runtime.bindingCalled', event => {
@@ -96,6 +105,14 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
   await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).fill('0.5'); await panel.getByRole('spinbutton', { name: 'Abfrageintervall in Sekunden' }).dispatchEvent('change');
   if (firstAvailable) await panel.getByRole('combobox', { name: 'Modus für die Platzwahl' }).selectOption('first');
   await panel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).click();
+  if (offerDisappears) {
+    await page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#cart-status')?.textContent.includes('Das Sitzangebot hat sich geändert'));
+    assert.equal(stored['ticketGoal:19'].status, 'watching');
+    assert.equal(stored['ticketGoal:19'].pending, null);
+    assert.deepEqual(backend.posts, []);
+    backend.suppressFirst = false;
+    await page.evaluate(() => sms.refreshAvailability());
+  }
   try { await page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#goal-progress')?.textContent.includes('1 / 2'), null, { timeout: 15000 }); }
   catch (error) {
     console.log('Goal diagnostic', JSON.stringify({ backend, state: stored['ticketGoal:19'], page: await page.evaluate(()=>({path:location.pathname,status:document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#cart-status')?.textContent,progress:document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#goal-progress')?.textContent,body:document.querySelector('#ticket-goal-progress')?.textContent})) })); throw error;
@@ -150,7 +167,7 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     console.log('PASS: logout on the cart preflight stops before seat selection, rechecking login and manually restarting preserves previously confirmed tickets');
     await expired.page.close();
 
-    const regular = await setup(browser, true, true, true);
+    const regular = await setup(browser, true, true, true, true);
     assert.deepEqual(regular.backend.posts, [[1001]]);
     assert.equal(regular.state().config.selectionMode, 'first');
     assert.equal(await regular.page.locator('#ticket-data-monitor').getByRole('combobox', { name: 'Modus für die Platzwahl' }).inputValue(), 'first');
@@ -160,7 +177,7 @@ async function setup(browser, regular = false, delayedCart = false, firstAvailab
     assert.equal(new URL(regular.page.url()).pathname, '/ols/werderbremen/de/einzelkarten/channel/shop/shoppingcart/index');
     assert.equal(regular.state().eventUrl, 'https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382');
     assert.deepEqual(regular.backend.sounds, ['horn', 'horn']);
-    console.log('PASS: first-available mode persists across navigation and buys offers without a known category mapping in the regular shop');
+    console.log('PASS: monitor keeps watching when an offer vanishes before selection, then takes the next offer and resumes after navigation');
     await regular.page.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

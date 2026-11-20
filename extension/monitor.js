@@ -8,7 +8,7 @@
   let sortedSnapshot, sortedSeats = [];
   let host, ui, running = false, last = null, change = null, error = '', changes = [];
   let preferences, config = globalThis.TicketPreferences.defaults(), armed = false, inFlight = false, runId = null, cartMessage = '', submitted = false;
-  let goal = null, actionEpoch = 0;
+  let goal = null, actionEpoch = 0, deferredSnapshot = null;
   let refreshMessage = '', refreshRevision = 0, renderFrame = null;
   let session = null, sessionCheck = null, checkedSessionAt = 0, sessionBusy = false;
   const sessionBlocked = state => state?.state === 'loggedOut' || state?.state === 'queue';
@@ -107,7 +107,7 @@
         goal = started.goal;
         if (goal.status === 'completed') { submitted = true; inFlight = false; armed = false; preferences.lock(false); cartMessage = 'Die gewünschte Ticketanzahl ist bereits im Warenkorb bestätigt.'; render(); return; }
         if (!running) start();
-        armed = true; runId = null; inFlight = false;
+        armed = true; runId = null; inFlight = false; deferredSnapshot = null;
         cartMessage = 'Suche nach ' + config.quantity + ' Tickets gestartet. Auch einzelne passende Angebote werden sofort im Shop geprüft.';
         void maybeCart(); queueRender();
       } catch (e) { inFlight = false; preferences.lock(false); cartMessage = e.message; render(); }
@@ -145,7 +145,7 @@
     render();
   }
   async function maybeCart() {
-    if (!armed || inFlight || !running || sessionBlocked(session)) return;
+    if (!armed || inFlight || !running || sessionBlocked(session) || (last && last === deferredSnapshot)) return;
     if (!last || error) { cartMessage = error ? 'Automatik wartet: ' + error : 'Automatik wartet auf die Sitzangebote des Shops.'; render(); return; }
     const remaining = goal ? goal.target - goal.confirmed.length : config.quantity;
     if (remaining < 1 || !globalThis.TicketPreferences.hasCandidate(last, config, goal?.secured)) {
@@ -153,12 +153,22 @@
       cartMessage = tooOld ? 'Automatik wartet: Seit über zwei Minuten keine Shopantwort. Warte auf die nächste Aktualisierung.' : 'Automatik wartet auf die noch fehlenden ' + remaining + ' Tickets. Bereits im Warenkorb bestätigte Plätze werden nicht erneut gewählt.';
       queueRender(); return;
     }
-    const currentRun = crypto.randomUUID(); runId = currentRun;
+    const currentRun = crypto.randomUUID(), offerSnapshot = last, epoch = actionEpoch;
+    runId = currentRun;
+    let keepWatching = false;
     inFlight = true;
     cartMessage = 'Der Shop prüft passende Sitzangebote. Warenkorbübergabe erst nach bestätigter Platzwahl …';
     queueRender();
     try {
       const result = await chrome.runtime.sendMessage({ type: 'cartStart', run: currentRun, config, goalId: goal?.id });
+      if (epoch !== actionEpoch) return;
+      if (result?.stage === 'waiting' && (!result.goal || result.goal.status === 'watching')) {
+        if (result.goal) goal = result.goal;
+        deferredSnapshot = offerSnapshot;
+        cartMessage = result.message;
+        keepWatching = true;
+        return;
+      }
       if (result?.session) {
         applySession(result.session);
         return;
@@ -166,8 +176,14 @@
       if (!['submitted', 'awaitingCart'].includes(result?.stage)) throw new Error(result?.error || 'Die Übergabe wurde nicht bestätigt. Bitte Auswahl und Warenkorb im Shop prüfen.');
       if (result.goal) goal = result.goal;
       submitted = true; cartMessage = result.count + ' bestätigte Plätze an den Warenkorbablauf des Shops übergeben. Erst die Warenkorbseite bestätigt den Fortschritt; danach wird nur die Restmenge gesucht.';
-    } catch (e) { cartMessage = 'Automatik angehalten: ' + e.message + ' Kein automatischer Wiederholungsversuch.'; }
-    finally { armed = false; inFlight = false; preferences?.lock(false); render(); }
+    } catch (e) {
+      if (epoch === actionEpoch) cartMessage = 'Automatik angehalten: ' + e.message + ' Kein automatischer Wiederholungsversuch.';
+    } finally {
+      if (!keepWatching) { armed = false; preferences?.lock(false); }
+      inFlight = false;
+      if (keepWatching && last !== offerSnapshot && !error && globalThis.TicketPreferences.hasCandidate(last, config, goal?.secured)) void maybeCart();
+      queueRender();
+    }
   }
   function render() {
     if (!ui || !host.isConnected) return;

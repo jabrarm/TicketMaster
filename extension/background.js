@@ -35,7 +35,7 @@ async function invokeCart(tabId, operation, config, run, secured = []) {
         if (operation === 'cancel') return globalThis.TicketCartFlow?.cancel(run) || { stage: 'stopped' };
         if (operation.startsWith('refresh') && config?.documentToken !== undefined && config.documentToken !== performance.timeOrigin) return { running: false };
         if (operation === 'refreshStop') return globalThis.TicketRefresh?.stop(config?.revision) || { running: false };
-        if (globalThis.TicketCartFlow?.version !== '1.4.5' || globalThis.TicketDataObserver?.version !== '1.4.5' || globalThis.TicketPreferences?.version !== '1.4.5' || globalThis.TicketRefresh?.version !== '1.4.5') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
+        if (globalThis.TicketCartFlow?.version !== '1.4.6' || globalThis.TicketDataObserver?.version !== '1.4.6' || globalThis.TicketPreferences?.version !== '1.4.6' || globalThis.TicketRefresh?.version !== '1.4.6') throw new Error('Bitte die Ticketseite vollständig neu laden und den Saalplan öffnen.');
         if (operation === 'refreshStart') {
           return globalThis.TicketRefresh.start(config.seconds, config.revision, config.openMap);
         }
@@ -71,7 +71,7 @@ chrome.action.onClicked.addListener(async tab => {
         flow: globalThis.TicketCartFlow?.version || 'ältere Version',
         observer: globalThis.TicketDataObserver?.version || 'ältere Version'
       }),
-      args: ['1.4.5']
+      args: ['1.4.6']
     });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id }, world: 'ISOLATED',
@@ -168,6 +168,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const config = { ...attempt.config, quantity: attempt.target - attempt.confirmed.length };
       const result = await invokeCart(tabId, 'prepare', config, message.run, attempt.secured);
       if (result.error) throw Object.assign(new Error(result.error), { session: result.session });
+      if (result.stage === 'waiting') {
+        const waitingGoal = await goals().defer(tabId, goal.id, message.run);
+        return { ...result, goal: waitingGoal };
+      }
       const ready = await goals().prepared(tabId, goal.id, message.run, result);
       // A stop received during the write takes precedence over the form click.
       if (stopRequests.has(stopKey)) {

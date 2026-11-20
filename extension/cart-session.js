@@ -44,6 +44,16 @@
         await this.storage.write(this.key(tab), goal); return goal;
       });
     }
+    async defer(tab, id, run) {
+      return this.lock(tab, async () => {
+        const goal = await this.require(tab, id);
+        if (goal.status === 'preparing' && goal.pending?.run === run) {
+          goal.status = 'watching'; goal.pending = null;
+          await this.storage.write(this.key(tab), goal);
+        }
+        return goal;
+      });
+    }
     async prepared(tab, id, run, result) {
       return this.lock(tab, async () => {
         const goal = await this.require(tab, id);
