@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TicketMaster – Verfügbarkeitsmonitor",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "minimum_chrome_version": "116",
   "options_page": "audio-options.html",
   "description": "Wählt Sitzplätze im regulären Werder-Einzelkartenshop und Hospitality-Shop nach Ticketanzahl und Kategoriepräferenzen.",

@@ -74,6 +74,16 @@
         return goal;
       });
     }
+    async pauseBeforeClick(tab, id, run, message) {
+      return this.lock(tab, async () => {
+        const goal = await this.require(tab, id);
+        if (goal.pending?.run !== run) return goal;
+        goal.pending = null;
+        if (goal.status !== 'stopped') { goal.status = 'paused'; goal.message = message; }
+        await this.storage.write(this.key(tab), goal);
+        return goal;
+      });
+    }
     async pause(tab, id, message) {
       return this.lock(tab, async () => {
         const goal = await this.require(tab, id);

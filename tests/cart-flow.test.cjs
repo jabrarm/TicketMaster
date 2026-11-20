@@ -12,6 +12,7 @@ function setup(options = {}) {
     if (options.cancel) controller.cancel('run-test-01');
   } };
   controller = createController({ preferences: () => preferences, now: () => time, wait: async ms => { time += ms; }, timeout: 300,
+    checkSession: () => { if (options.loggedOut) throw new Error('Abgemeldet'); },
     eventId: () => '674379', client: () => client, selection: () => selected, maxTickets: () => options.max || 6,
     form: () => ({}), validForm: () => !options.invalidForm, button: () => ({ click: () => { clicks++; } }),
     cardReady: () => !options.unconfirmed, buttonReady: () => !options.disabled
@@ -61,4 +62,13 @@ test('preparing a smaller batch cannot submit until the background explicitly co
   const prepared = await s.controller.prepare(s.config, 'run-test-01');
   assert.equal(prepared.count, 1); assert.equal(s.clicks(), 0);
   assert.equal(s.controller.submit('run-test-01').count, 1); assert.equal(s.clicks(), 1);
+});
+
+test('known logout after seat selection blocks the click even when the form is ready', async () => {
+  const options = {};
+  const s = setup(options);
+  await s.controller.prepare(s.config, 'run-test-01');
+  options.loggedOut = true;
+  assert.throws(() => s.controller.submit('run-test-01'), /Abgemeldet/);
+  assert.equal(s.clicks(), 0);
 });

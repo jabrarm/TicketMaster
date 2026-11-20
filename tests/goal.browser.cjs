@@ -8,11 +8,12 @@ async function setup(browser, regular = false) {
   const base = regular ? '/ols/werderbremen/de/einzelkarten/channel/shop/' : '/ols/werderbremen-hospitality/de/tageskarte/channel/shop/';
   const event = regular ? '674382' : '674379', startUrl = 'https://www.ticket-onlineshop.com' + base + 'areaplan/venue/event/' + event;
   const page = await browser.newPage(), cdp = await page.context().newCDPSession(page);
-  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [] };
+  const data = fixture(), backend = { items: [], posts: [], second: false, returns: 0, sounds: [], loggedIn: true };
   data.mapping.priceCategories = [{ id: 69, name: 'PK8 VIP-Rang Gold' }, { id: 70, name: 'PK8 VIP-Rang Platin' }];
   for (const part of Object.values(data)) part.seatmapId = event;
   if (regular) for (const category of data.mapping.priceCategories) category.name = 'PK1';
-  const cartHtml = () => '<!doctype html><meta charset="utf-8"><title>Warenkorb</title>' + (backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) => `<li class="seat-card" data-seat-identifier="cart-${i + 1}" data-seat-id="${item}">Ticket</li>`).join('') + '</ul>' : '<div class="empty-state">Keine Tickets</div>') + '<a id="continue-shopping-button" href="' + base + 'index">Weiter einkaufen</a>';
+  const cartHtml = () => '<!doctype html><meta charset="utf-8"><title>Warenkorb</title>' +
+    '<header><a href="' + base + (backend.loggedIn ? 'customer/logout' : 'customer/login') + '">Konto</a></header>' + (backend.items.length ? '<ul id="seat-cards-list">' + backend.items.map((item, i) => `<li class="seat-card" data-seat-identifier="cart-${i + 1}" data-seat-id="${item}">Ticket</li>`).join('') + '</ul>' : '<div class="empty-state">Keine Tickets</div>') + '<a id="continue-shopping-button" href="' + base + 'index">Weiter einkaufen</a>';
   const eventHtml = `<!doctype html><meta charset="utf-8"><title>Test-Saalplan</title><button id="choose-seat-button">Jetzt Plätze auswählen</button>
   <form id="seatCardForm" method="post" action="${base}shoppingcart/addselecteditemsareas/event/${event}"><ul id="seat-cards-list"></ul><button id="add-to-cart" type="submit">In den Warenkorb</button></form><script>
   window.selected=[];let mapReady=false;
@@ -115,6 +116,26 @@ async function setup(browser, regular = false) {
     assert.deepEqual(stopped.backend.posts, [[1001]]); assert.deepEqual(stopped.backend.items, [1001]);
     console.log('PASS: stopping after the first confirmed ticket preserves it and prevents a later second purchase');
     await stopped.page.close();
+
+    const expired = await setup(browser);
+    const expiredPanel = expired.page.locator('#ticket-data-monitor');
+    await expired.page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#session-status')?.textContent.includes('Anmeldung vom Shop bestätigt'));
+    expired.backend.loggedIn = false;
+    expired.backend.second = true;
+    await expired.page.evaluate(() => sms.refreshAvailability());
+    await expired.page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#session-status')?.textContent.includes('Abgemeldet'));
+    assert.equal(await expiredPanel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).isDisabled(), true);
+    assert.deepEqual(expired.backend.posts, [[1001]]);
+    assert.equal(expired.state().confirmed.length, 1);
+    expired.backend.loggedIn = true;
+    await expiredPanel.getByRole('button', { name: 'Anmeldung prüfen' }).click();
+    await expired.page.waitForFunction(() => document.querySelector('#ticket-data-monitor')?.shadowRoot.querySelector('#session-status')?.textContent.includes('Anmeldung vom Shop bestätigt'));
+    assert.deepEqual(expired.backend.posts, [[1001]], 'rechecking alone must not restart the search');
+    await expiredPanel.getByRole('button', { name: 'Automatisch in den Warenkorb' }).click();
+    await expired.page.waitForFunction(() => document.querySelector('#ticket-goal-progress')?.textContent.includes('2 von 2'), null, { timeout: 15000 });
+    assert.deepEqual(expired.backend.posts, [[1001], [1002]]);
+    console.log('PASS: logout on the cart preflight stops before seat selection, rechecking login and manually restarting preserves previously confirmed tickets');
+    await expired.page.close();
 
     const regular = await setup(browser, true);
     assert.deepEqual(regular.backend.posts, [[1001]]);

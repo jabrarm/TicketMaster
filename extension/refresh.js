@@ -62,7 +62,7 @@
       timer = null; void trigger(); if (running) timer = schedule(tick, seconds * 1000);
     }
     return {
-      version: '1.4.1',
+      version: '1.4.2',
       start(value, commandRevision) {
         if (!Number.isInteger(value) || value < 2 || value > 120) throw new Error('Das Abfrageintervall muss zwischen 2 und 120 Sekunden liegen.');
         if (!acceptRevision(commandRevision)) return { running, seconds };

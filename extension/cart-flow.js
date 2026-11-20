@@ -42,12 +42,12 @@
       throw selectionTimeout();
     }
     const api = {
-      version: '1.4.1',
+      version: '1.4.2',
       isBusy: () => Boolean(active),
       updateSnapshot(value) { snapshot = value; },
       getState() {
         const current = currentSnapshot();
-        return { version: '1.4.1', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
+        return { version: '1.4.2', hasSnapshot: Boolean(current), inventory: current?.inventory || null,
           seatCount: current?.seats?.length || 0, ageSeconds: current ? Math.round((now() - current.checkedAt) / 1000) : null };
       },
       cancel(runId) {
@@ -61,6 +61,7 @@
       },
       async prepare(config, runId, secured = []) {
         if (typeof runId !== 'string' || !/^[a-zA-Z0-9-]{8,100}$/.test(runId)) throw new Error('Ungültige Automatik-Sitzung.');
+        env.checkSession?.();
         if (cancelled.has(runId)) throw new Error('Diese Automatik-Sitzung wurde bereits gestoppt.');
         if (active || used.has(runId)) throw new Error('Ein Warenkorblauf ist bereits aktiv oder wurde schon ausgeführt.');
         const prefs = env.preferences(); prefs.validate(config);
@@ -116,6 +117,7 @@
         if (!run || run.id !== runId || !run.prepared) throw new Error('Die bestätigte Teilauswahl ist nicht mehr aktiv.');
         check(run);
         try {
+          env.checkSession?.();
           if (!exact(ids(run.selection.getSelectedSeats()), run.selected) || run.selection.getLostSeatAmount?.() > 0 || !env.validForm(run.form) || !env.buttonReady(run.button)) throw new Error('Die bestätigte Platzauswahl oder der Warenkorbknopf hat sich verändert. Keine Übergabe.');
           // The background persists the pending batch before invoking this click.
           // Navigation may destroy this context; never retry an unconfirmed POST.
@@ -134,6 +136,7 @@
   const eventId = () => globalThis.TicketAvailability.eventId(location.href);
   globalThis.TicketCartFlow = createController({
     preferences: () => globalThis.TicketPreferences,
+    checkSession: () => globalThis.TicketCartReceipt?.assertSession(),
     snapshot: () => globalThis.TicketDataObserver?.getSnapshot() || null,
     dataError: () => globalThis.TicketDataObserver?.getError(),
     eventId,

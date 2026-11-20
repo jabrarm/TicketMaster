@@ -1,16 +1,18 @@
-# TicketMaster · Verfügbarkeit und Warenkorb 1.4.1
+# TicketMaster · Verfügbarkeit und Warenkorb 1.4.2
 
 Chrome-Erweiterung (ab Chrome 116) für den regulären Werder-Einzelkartenshop und den Werder-Hospitality-Shop: freie Sitze aus strukturierten Daten erkennen, Ticketanzahl und Kategoriepräferenzen einstellen und eine bestätigte Auswahl an den jeweils richtigen Warenkorb übergeben. Keine Farberkennung, Zoom-Kalibrierung oder eingelernten Klickpunkte.
 
 ## Installieren und starten
 
 1. Das ZIP der aktuellen Version unter `dist/` herunterladen und entpacken.
-2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.1**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
+2. Unter `chrome://extensions` Entwicklermodus aktivieren und **Entpackte Erweiterung laden** wählen. Den Ordner `extension` mit `manifest.json` auswählen. Bei einem Update **Neu laden** anklicken. Angezeigte Version: **1.4.2**. `storage` speichert Einstellungen und den laufenden Suchfortschritt.
 3. Den gewünschten Saalplan im [regulären Einzelkartenshop](https://www.ticket-onlineshop.com/ols/werderbremen/de/einzelkarten/channel/shop/areaplan/venue/event/674382) oder im [Hospitality-Shop](https://www.ticket-onlineshop.com/ols/werderbremen-hospitality/de/tageskarte/channel/shop/areaplan/venue/event/674379) öffnen. Nach Installation oder Update die Ticketseite neu laden. Eine Warteschlange normal durchlaufen und Cookie-Dialoge selbst bedienen. Für eine andere Veranstaltung oder einen anderen Shop einen neuen Tab verwenden.
 4. Im Shop **Jetzt Plätze auswählen** öffnen und den Saalplan laden lassen.
 5. Auf das Erweiterungssymbol klicken. Für die reine Anzeige **Überwachung starten** wählen.
 6. **Aktualisierung alle (Sekunden)** einstellen: 2–120 Sekunden, Standard 20. Für die Automatik **Anzahl Tickets** von 1 bis 6 einstellen. Kategorien über die Gruppen-Häkchen komplett auswählen, Unterkategorien bei Bedarf abwählen und Gruppen sowie Unterkategorien mit **↑ / ↓** sortieren. Oben steht die höchste Präferenz. Über das Dreieck lassen sich Unterkategorien ein- und ausklappen.
 7. **Nebeneinander bevorzugen; sonst nach Kategoriepräferenz** aktiviert lassen, wenn zuerst eine zusammenhängende Gruppe bevorzugt werden soll. Danach **Automatisch in den Warenkorb** anklicken. Die Automatik prüft passende Angebote aus kürzlich empfangenen Shopantworten durch die normale Platzwahl.
+
+**Neu in 1.4.2:** Der Monitor prüft die Anmeldung beim Start, während der Überwachung ungefähr einmal pro Minute und beim Zurückwechseln zum Tab, wenn die letzte Prüfung mindestens 20 Sekunden zurückliegt. **Anmeldung prüfen** löst eine manuelle Kontrolle aus. Die Prüfung nutzt einen regulären Warenkorbabruf. Einen gleichzeitig laufenden Abruf teilt sie mit der Warenkorbvorprüfung. Bei erkannter Abmeldung oder Warteschlange hält der Monitor an. Nach der Anmeldung bzw. der Warteschlange erneut prüfen und die Suche selbst starten. Ein unbekannter Status wird angezeigt und führt allein zu keinem Stopp. Direkt vor dem Warenkorbklick prüft die Erweiterung den zuletzt bekannten Status lokal.
 
 **Neu in 1.4.1:** Sitzkarten werden unmittelbar nach Änderungen im Formular geprüft. Ein kurzer Ping meldet neu freie Sitze aus einer gültigen Shop-Liste. Nach einer bestätigten Warenkorbzugabe ertönt ein Nebelhorn. Standardmäßig wird der Hornklang synthetisch erzeugt. Unter **Erweiterungsoptionen → Warenkorbton** lässt sich eine eigene Weserstadion-Aufnahme auswählen. Die Datei bleibt lokal im Browser.
 

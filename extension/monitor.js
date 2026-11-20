@@ -7,6 +7,31 @@
   let preferences, config = globalThis.TicketPreferences.defaults(), armed = false, inFlight = false, runId = null, cartMessage = '', submitted = false;
   let goal = null, actionEpoch = 0;
   let refreshMessage = '', refreshRevision = 0, renderFrame = null;
+  let session = null, sessionCheck = null, checkedSessionAt = 0, sessionBusy = false;
+  const sessionBlocked = state => state?.state === 'loggedOut' || state?.state === 'queue';
+  const sessionLabels = {
+    loggedIn: 'Anmeldung vom Shop bestätigt.',
+    loggedOut: 'Abgemeldet. Bitte im Shop anmelden, anschließend erneut prüfen und die Suche starten.',
+    queue: 'Shop-Warteschlange. Bitte im Shop warten, anschließend erneut prüfen und die Suche starten.',
+    unknown: 'Anmeldung konnte nicht geprüft werden. Bitte den Kontostatus im Shop prüfen.'
+  };
+  function applySession(result) {
+    if (!result || result.checkedAt < (session?.checkedAt || 0)) return;
+    if (result.state !== 'unknown' || !sessionBlocked(session)) session = result;
+    if (sessionBlocked(session) && (running || armed || inFlight)) stop(sessionLabels[session.state]);
+    else queueRender();
+  }
+  function checkSession(force = false) {
+    if (sessionCheck) return sessionCheck;
+    if ((!force && Date.now() - checkedSessionAt < 20000) || !globalThis.chrome?.runtime?.sendMessage) return;
+    checkedSessionAt = Date.now();
+    sessionBusy = true; queueRender();
+    sessionCheck = chrome.runtime.sendMessage({ type: 'sessionCheck' })
+      .then(result => applySession(result?.session || { state: 'unknown', checkedAt: Date.now() }))
+      .catch(() => applySession({ state: 'unknown', checkedAt: Date.now() }))
+      .finally(() => { sessionBusy = false; sessionCheck = null; queueRender(); });
+    return sessionCheck;
+  }
   function queueRender() {
     if (renderFrame !== null) return;
     renderFrame = requestAnimationFrame(() => { renderFrame = null; render(); });
@@ -31,6 +56,7 @@
       fieldset{border:1px solid #395346;border-radius:10px;margin:14px 0;padding:12px}legend{font-weight:650}input[type=number]{width:65px;padding:6px;background:#203d30;color:inherit;border:1px solid #638472;border-radius:6px}input[type=checkbox]{accent-color:#b5e5ba}.checkline{display:flex;align-items:center;gap:8px;margin:7px 0;flex:1}.prefgroup{border-top:1px solid #395346;padding:8px 0}.prefgroup summary{display:flex;gap:4px;align-items:center;cursor:pointer}.prefgroup summary::before{content:'▸'}.prefgroup[open]>summary::before{content:'▾'}.prefchild{display:flex;gap:4px;align-items:center;padding-left:14px;font-size:12px}.order{padding:3px 7px}summary:focus-visible{outline:2px solid #b5e5ba}#cart-status{padding:10px;border:1px solid #638472;border-radius:8px}
     </style><section aria-label="Ticket-Verfügbarkeit"><header><div><h1>Ticket-Verfügbarkeit</h1><span class="muted">Shopdaten · ohne Farberkennung</span></div><button class="close" aria-label="Schließen">×</button></header><main>
       <div class="controls"><button id="start" class="primary">Überwachung starten</button><button id="stop" disabled>Stoppen</button></div>
+      <p id="session-status" role="status" aria-live="polite"></p><button id="session-check">Anmeldung prüfen</button>
       <p id="status" class="status" role="status" aria-live="polite"></p><p id="checked" class="muted"></p><p id="refresh-status" class="muted" role="status"></p>
       <div id="preferences"></div><p class="muted">Verfügbare Einzeltickets werden sofort übernommen. Danach wird nur die noch fehlende Anzahl gesucht. Die Reservierungsfrist des Shops läuft dabei weiter.</p><p id="goal-progress" role="status"></p><button id="auto">Automatisch in den Warenkorb</button><p id="cart-status" role="status" aria-live="polite">Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.</p>
       <div><span id="count" class="count">–</span> <span id="count-label">gemeldete freie Sitze</span></div>
@@ -41,8 +67,9 @@
     </main></section>`;
     (document.body || document.documentElement).append(host);
     ui.querySelector('.close').onclick = () => { stop(); host.remove(); };
-    ui.querySelector('#start').onclick = start;
-    ui.querySelector('#stop').onclick = stop;
+    ui.querySelector('#start').onclick = () => start();
+    ui.querySelector('#stop').onclick = () => stop();
+    ui.querySelector('#session-check').onclick = () => void checkSession(true);
     ui.querySelector('#block').onchange = render;
     preferences = globalThis.TicketPreferencePanel.create(ui.querySelector('#preferences'), value => {
       const interval = config.refreshSeconds ?? 20; config = value;
@@ -52,7 +79,7 @@
     config = preferences.get();
     preferences.lock(armed || inFlight);
     ui.querySelector('#auto').onclick = async () => {
-      if (submitted || armed || inFlight) return;
+      if (submitted || armed || inFlight || sessionBlocked(session)) return;
       const epoch = ++actionEpoch;
       config = preferences.get();
       try { globalThis.TicketPreferences.validate(config); if (![...globalThis.TicketPreferences.rank(config)].length) throw new Error('Bitte mindestens eine Unterkategorie auswählen.'); }
@@ -73,9 +100,11 @@
     render();
   }
   function start() {
+    if (sessionBlocked(session)) return;
     tracker.reset(); last = null; change = null; error = ''; changes = []; running = true;
     render(); window.postMessage({ channel, type: 'request' }, location.origin);
     updateRefresh();
+    void checkSession();
   }
   function updateRefresh() {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
@@ -83,7 +112,7 @@
       if (result?.error) { refreshMessage = 'Aktualisierung konnte nicht gestartet werden: ' + result.error; render(); }
     }).catch(e => { refreshMessage = 'Aktualisierung nicht bestätigt: ' + e.message; render(); });
   }
-  function stop() {
+  function stop(reason) {
     actionEpoch++;
     running = false; armed = false;
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) void chrome.runtime.sendMessage({ type: 'refreshStop', ...refreshCommand() }).catch(() => {});
@@ -96,11 +125,12 @@
       chrome.runtime.sendMessage({ type: 'cartStop', run: runId }).catch(() => {});
       cartMessage = 'Stoppen angefordert. Bereits ausgewählte Plätze bitte im Shop prüfen.';
     }
+    if (reason) cartMessage = reason;
     if (!inFlight) preferences?.lock(false);
     render();
   }
   async function maybeCart() {
-    if (!armed || inFlight || !running) return;
+    if (!armed || inFlight || !running || sessionBlocked(session)) return;
     if (!last || error) { cartMessage = error ? 'Automatik wartet: ' + error : 'Automatik wartet auf die Sitzangebote des Shops.'; render(); return; }
     const remaining = goal ? goal.target - goal.confirmed.length : config.quantity;
     if (remaining < 1 || !globalThis.TicketPreferences.hasCandidate(last, config, goal?.secured)) {
@@ -114,6 +144,10 @@
     queueRender();
     try {
       const result = await chrome.runtime.sendMessage({ type: 'cartStart', run: currentRun, config, goalId: goal?.id });
+      if (result?.session) {
+        applySession(result.session);
+        return;
+      }
       if (!['submitted', 'awaitingCart'].includes(result?.stage)) throw new Error(result?.error || 'Die Übergabe wurde nicht bestätigt. Bitte Auswahl und Warenkorb im Shop prüfen.');
       if (result.goal) goal = result.goal;
       submitted = true; cartMessage = result.count + ' bestätigte Plätze an den Warenkorbablauf des Shops übergeben. Erst die Warenkorbseite bestätigt den Fortschritt; danach wird nur die Restmenge gesucht.';
@@ -122,8 +156,14 @@
   }
   function render() {
     if (!ui || !host.isConnected) return;
-    ui.querySelector('#start').disabled = running || !eventId(location.href); ui.querySelector('#stop').disabled = !running;
-    ui.querySelector('#auto').disabled = armed || inFlight || submitted || !eventId(location.href);
+    const supported = Boolean(eventId(location.href)), blocked = sessionBlocked(session);
+    ui.querySelector('#start').disabled = running || blocked || !supported; ui.querySelector('#stop').disabled = !running;
+    ui.querySelector('#auto').disabled = armed || inFlight || submitted || blocked || !supported;
+    const sessionStatus = ui.querySelector('#session-status');
+    sessionStatus.classList.toggle('error', blocked);
+    sessionStatus.textContent = supported ? (session ? sessionLabels[session.state] + ' · ' + clock(session.checkedAt) : 'Anmeldung noch nicht geprüft.') : '';
+    ui.querySelector('#session-check').hidden = !supported;
+    ui.querySelector('#session-check').disabled = sessionBusy;
     ui.querySelector('#cart-status').textContent = cartMessage || 'Automatik ist ausgeschaltet. Erst Anzahl und Präferenzen einstellen.';
     ui.querySelector('#refresh-status').textContent = refreshMessage;
     ui.querySelector('#goal-progress').textContent = goal ? goal.confirmed.length + ' / ' + goal.target + ' Tickets zuletzt im Warenkorb bestätigt.' : '';
@@ -190,6 +230,10 @@
     if (host?.isConnected) { stop(); host.remove(); } else mount();
   });
   setInterval(() => { if (running) render(); }, 15000);
+  setInterval(() => { if (running) void checkSession(); }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (running && !document.hidden) void checkSession();
+  });
   window.__ticketDataMonitor = true;
   async function resumeGoal() {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage || !eventId(location.href)) return;

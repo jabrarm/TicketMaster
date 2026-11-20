@@ -124,7 +124,7 @@
     const ranks = rank(config), excluded = new Set(secured.map(s => Number(s.id)));
     return snapshot.seats.some(seat => !excluded.has(seat.id) && ranks.has(match(seat)));
   }
-  const api = { version: '1.4.1', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
+  const api = { version: '1.4.2', catalog, allIds, defaults, validate, match, rank, plan, candidates, partialCandidates, hasCandidate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TicketPreferences = api;
 })();
